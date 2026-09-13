@@ -5,10 +5,12 @@
 # at build time, not read at runtime) — set it as a Railway build variable
 # pointing at the backend service's public domain.
 
-FROM node:22-alpine AS build
+FROM node:22.12-alpine AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
-RUN npm ci
+RUN unset NPM_CONFIG_INIT_VERSION npm_config_init_version NPM_CONFIG_VERSION npm_config_version && \
+    npm install -g npm@11.5.1 && \
+    npm ci
 COPY . .
 ARG VITE_API_URL
 ARG VITE_VAPID_PUBLIC_KEY
@@ -16,10 +18,12 @@ ENV VITE_API_URL=${VITE_API_URL}
 ENV VITE_VAPID_PUBLIC_KEY=${VITE_VAPID_PUBLIC_KEY}
 RUN npm run build
 
-FROM node:22-alpine
+FROM node:22.12-alpine
 WORKDIR /app
 COPY package.json package-lock.json ./
-RUN npm ci --omit=dev
+RUN unset NPM_CONFIG_INIT_VERSION npm_config_init_version NPM_CONFIG_VERSION npm_config_version && \
+    npm install -g npm@11.5.1 && \
+    npm ci --omit=dev
 COPY --from=build /app/dist ./dist
 
 # Railway injects $PORT — `serve -s` gives SPA fallback (any unknown path
