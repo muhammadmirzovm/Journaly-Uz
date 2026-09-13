@@ -5,7 +5,12 @@ const productionApiBase =
     ? 'https://api.journaly.uz/api'
     : '/api'
 
-const BASE = import.meta.env.VITE_API_URL || productionApiBase
+const isJournalyHost =
+  typeof window !== 'undefined' && window.location.hostname.endsWith('journaly.uz')
+
+const BASE = isJournalyHost
+  ? productionApiBase
+  : import.meta.env.VITE_API_URL || productionApiBase
 
 const api = axios.create({ baseURL: BASE })
 
