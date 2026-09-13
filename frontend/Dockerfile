@@ -18,9 +18,10 @@ RUN npm run build
 
 FROM node:22-alpine
 WORKDIR /app
-RUN npm install -g serve@14
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev
 COPY --from=build /app/dist ./dist
 
 # Railway injects $PORT — `serve -s` gives SPA fallback (any unknown path
 # returns index.html instead of 404, so client-side routes work on refresh).
-CMD serve -s dist -l ${PORT:-3000}
+CMD ["sh", "-c", "./node_modules/.bin/serve -s dist -l tcp://0.0.0.0:${PORT:-3000}"]
