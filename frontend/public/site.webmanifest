@@ -1,0 +1,20 @@
+{
+  "name": "Journaly",
+  "short_name": "Journaly",
+  "description": "O'quv markazlari uchun davomat, baho, uy vazifasi, imtihon, to'lov va Telegram xabarnomalari platformasi.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0F172A",
+  "theme_color": "#0D9488",
+  "lang": "uz",
+  "categories": ["education", "productivity"],
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "48x48 72x72 96x96 128x128 192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -1,10 +1,10 @@
 User-agent: *
-Allow: /$
-Allow: /login
-Allow: /register
-Allow: /forgot-password
+Allow: /
 
 # Private, login-only areas — no value for search engines
+Disallow: /login
+Disallow: /register
+Disallow: /forgot-password
 Disallow: /dashboard
 Disallow: /groups
 Disallow: /profile
@@ -12,6 +12,10 @@ Disallow: /settings
 Disallow: /students
 Disallow: /exams
 Disallow: /questions
+Disallow: /payments
+Disallow: /my-payments
+Disallow: /scanner
+Disallow: /coins
 Disallow: /invite
 
 Sitemap: https://journaly.uz/sitemap.xml

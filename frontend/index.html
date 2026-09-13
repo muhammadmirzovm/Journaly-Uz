@@ -1,42 +1,108 @@
 <!doctype html>
-<html lang="en">
+<html lang="uz">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Journaly — Attendance, Grades & Gamified Classroom Journal</title>
-    <meta name="description" content="Journaly helps teachers and academies track attendance, scores and learning journals, and gamify the classroom with coins, stickers and a live leaderboard." />
-    <meta name="keywords" content="journaly, academy journal, classroom journal, attendance tracker, student grades, teacher app, o'quv jurnali, davomat, baholar" />
+    <title>Journaly — O'quv markazlari uchun davomat, baho va sinf jurnali</title>
+    <meta name="description" content="Journaly o'quv markazlari, o'qituvchilar, o'quvchilar va ota-onalar uchun davomat, baholar, uy vazifasi, imtihonlar, to'lovlar va Telegram xabarnomalarini boshqaradigan zamonaviy sinf platformasi." />
+    <meta name="keywords" content="journaly, o'quv markazi CRM, o'quv jurnali, elektron jurnal, davomat, baholar, o'qituvchi platformasi, academy journal, attendance tracker, student grades" />
+    <meta name="application-name" content="Journaly" />
+    <meta name="author" content="Journaly" />
     <meta name="theme-color" content="#0D9488" />
-    <meta name="robots" content="index, follow" />
+    <meta name="robots" content="index, follow, max-image-preview:large" />
     <meta name="yandex-verification" content="5a3d21f2aaf37d52" />
     <link rel="canonical" href="https://journaly.uz/" />
+    <link rel="alternate" href="https://journaly.uz/" hreflang="uz" />
+    <link rel="alternate" href="https://journaly.uz/" hreflang="x-default" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="manifest" href="/site.webmanifest" />
 
     <!-- Open Graph (Facebook, Telegram, LinkedIn) -->
     <meta property="og:type" content="website" />
+    <meta property="og:locale" content="uz_UZ" />
+    <meta property="og:locale:alternate" content="en_US" />
+    <meta property="og:locale:alternate" content="ru_RU" />
     <meta property="og:site_name" content="Journaly" />
-    <meta property="og:title" content="Journaly — Attendance, Grades & Gamified Classroom Journal" />
-    <meta property="og:description" content="Track attendance, scores and learning journals, and gamify your classroom with coins, stickers and a live leaderboard." />
+    <meta property="og:title" content="Journaly — O'quv markazlari uchun raqamli jurnal" />
+    <meta property="og:description" content="Davomat, baholar, uy vazifasi, imtihonlar, to'lovlar va ota-ona xabarnomalarini bitta platformada boshqaring." />
     <meta property="og:url" content="https://journaly.uz/" />
-    <meta property="og:image" content="https://journaly.uz/favicon.svg" />
+    <meta property="og:image" content="https://journaly.uz/og-image.svg" />
+    <meta property="og:image:secure_url" content="https://journaly.uz/og-image.svg" />
+    <meta property="og:image:type" content="image/svg+xml" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Journaly classroom dashboard preview" />
 
     <!-- Twitter Card -->
-    <meta name="twitter:card" content="summary" />
-    <meta name="twitter:title" content="Journaly — Attendance, Grades & Gamified Classroom Journal" />
-    <meta name="twitter:description" content="Track attendance, scores and learning journals, and gamify your classroom with coins, stickers and a live leaderboard." />
-    <meta name="twitter:image" content="https://journaly.uz/favicon.svg" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Journaly — O'quv markazlari uchun raqamli jurnal" />
+    <meta name="twitter:description" content="Davomat, baholar, uy vazifasi, imtihonlar, to'lovlar va Telegram xabarnomalari." />
+    <meta name="twitter:image" content="https://journaly.uz/og-image.svg" />
+    <meta name="twitter:image:alt" content="Journaly classroom dashboard preview" />
 
     <!-- Structured data -->
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
-      "@type": "SoftwareApplication",
+      "@type": "WebApplication",
       "name": "Journaly",
       "applicationCategory": "EducationApplication",
+      "applicationSubCategory": "Classroom management software",
       "operatingSystem": "Web",
       "url": "https://journaly.uz/",
-      "description": "Journaly helps teachers and academies track attendance, scores and learning journals, and gamify the classroom with coins, stickers and a live leaderboard.",
-      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
+      "inLanguage": ["uz", "en", "ru"],
+      "description": "Journaly helps academies and teachers manage attendance, grades, homework, exams, payments, parent updates and gamified classroom progress.",
+      "image": "https://journaly.uz/og-image.svg",
+      "publisher": {
+        "@type": "Organization",
+        "name": "Journaly",
+        "url": "https://journaly.uz/",
+        "logo": "https://journaly.uz/favicon.svg",
+        "sameAs": ["https://t.me/journalyuzbot"]
+      },
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+      "featureList": [
+        "Attendance tracking",
+        "Student gradebook",
+        "Homework and lesson journals",
+        "Exam management",
+        "Parent progress dashboard",
+        "Telegram notifications",
+        "Payments and receipts",
+        "Gamified quizzes and rewards"
+      ]
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "Journaly bepulmi?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Ha, Journaly bepul ishlaydi. Boshlash uchun karta yoki trial kerak emas."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Journaly kimlar uchun?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Journaly o'quv markazlari, o'qituvchilar, o'quvchilar va ota-onalar uchun davomat, baholar, uy vazifasi, imtihonlar va to'lovlarni boshqarishga yordam beradi."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Telegram xabarnomalari bormi?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Ha, Journaly Telegram orqali dars yakuni, davomat, baholar va uy vazifasi haqida xabar yubora oladi."
+          }
+        }
+      ]
     }
     </script>
   </head>
