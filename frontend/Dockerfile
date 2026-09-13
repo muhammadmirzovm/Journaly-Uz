@@ -9,8 +9,7 @@ FROM node:22.12-alpine AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN unset NPM_CONFIG_INIT_VERSION npm_config_init_version NPM_CONFIG_VERSION npm_config_version && \
-    npm install -g npm@11.5.1 && \
-    npm ci
+    npm ci --no-audit --no-fund
 COPY . .
 ARG VITE_API_URL
 ARG VITE_VAPID_PUBLIC_KEY
@@ -22,8 +21,7 @@ FROM node:22.12-alpine
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN unset NPM_CONFIG_INIT_VERSION npm_config_init_version NPM_CONFIG_VERSION npm_config_version && \
-    npm install -g npm@11.5.1 && \
-    npm ci --omit=dev
+    npm ci --omit=dev --no-audit --no-fund
 COPY --from=build /app/dist ./dist
 
 # Railway injects $PORT — `serve -s` gives SPA fallback (any unknown path
