@@ -2,7 +2,7 @@ import pytest
 from django.contrib.auth import get_user_model
 from rest_framework.test import APIClient
 from academies.models import Academy
-from groups.models import Group, Lesson, Attendance
+from groups.models import Group, GroupMembership, Lesson, Attendance
 
 User = get_user_model()
 
@@ -53,6 +53,50 @@ def test_list_groups(teacher_client, group):
     res = teacher_client.get('/api/groups/')
     assert res.status_code == 200
     assert any(g['name'] == 'Math' for g in res.data)
+
+
+@pytest.mark.django_db
+def test_admin_cannot_read_group_from_another_academy(academy):
+    other_academy = Academy.objects.create(name='Other Academy', slug='other-academy')
+    admin = User.objects.create_user(username='scoped_admin', password='pass1234', role='admin', academy=academy)
+    other_teacher = User.objects.create_user(username='other_teacher', password='pass1234', role='teacher', academy=other_academy)
+    other_group = Group.objects.create(name='Other Math', teacher=other_teacher)
+
+    client = APIClient()
+    client.force_authenticate(admin)
+
+    res = client.get(f'/api/groups/{other_group.id}/')
+    assert res.status_code == 404
+
+
+@pytest.mark.django_db
+def test_direct_add_member_rejects_student_from_another_academy(group, teacher):
+    other_academy = Academy.objects.create(name='Other Academy', slug='other-academy')
+    other_student = User.objects.create_user(
+        username='outside_student', password='pass1234', role='student', academy=other_academy,
+    )
+    client = APIClient()
+    client.force_authenticate(teacher)
+
+    res = client.post(f'/api/groups/{group.id}/members/add/', {'user_id': other_student.id})
+
+    assert res.status_code == 404
+    assert not GroupMembership.objects.filter(group=group, student=other_student).exists()
+
+
+@pytest.mark.django_db
+def test_join_key_rejects_existing_other_academy_student(group):
+    other_academy = Academy.objects.create(name='Other Academy', slug='other-academy')
+    other_student = User.objects.create_user(
+        username='outside_joiner', password='pass1234', role='student', academy=other_academy,
+    )
+    client = APIClient()
+    client.force_authenticate(other_student)
+
+    res = client.post('/api/groups/join/', {'join_key': group.join_key})
+
+    assert res.status_code == 400
+    assert not GroupMembership.objects.filter(group=group, student=other_student).exists()
 
 
 @pytest.mark.django_db

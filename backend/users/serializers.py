@@ -10,12 +10,11 @@ class RegisterSerializer(serializers.ModelSerializer):
 
     class Meta:
         model  = User
-        fields = ('id', 'username', 'email', 'first_name', 'last_name', 'password', 'role')
+        fields = ('id', 'username', 'email', 'first_name', 'last_name', 'password')
 
     def create(self, validated_data):
-        role = validated_data.pop('role', User.STUDENT)
         user = User.objects.create_user(**validated_data)
-        user.role = role
+        user.role = User.STUDENT
         user.save(update_fields=['role'])
         return user
 
@@ -30,6 +29,10 @@ class UserSerializer(serializers.ModelSerializer):
         fields = (
             'id', 'username', 'email', 'first_name', 'last_name',
             'role', 'bio', 'academy', 'academy_name', 'academy_color',
+            'has_password', 'telegram_id', 'last_seen', 'date_joined',
+        )
+        read_only_fields = (
+            'id', 'role', 'academy', 'academy_name', 'academy_color',
             'has_password', 'telegram_id', 'last_seen', 'date_joined',
         )
 

@@ -26,6 +26,36 @@ class IsTeacherOrAdmin(permissions.BasePermission):
         return request.user.is_authenticated and request.user.role in ('teacher', 'admin')
 
 
+def _visible_groups_for(user):
+    qs = Group.objects.select_related('teacher', 'teacher__academy')
+    if not user.is_authenticated:
+        return qs.none()
+    if user.role == 'admin':
+        return qs.filter(teacher__academy=user.academy)
+    if user.role == 'teacher':
+        return qs.filter(teacher=user)
+    return qs.filter(memberships__student=user).distinct()
+
+
+def _manageable_groups_for(user):
+    qs = Group.objects.select_related('teacher', 'teacher__academy')
+    if not user.is_authenticated:
+        return qs.none()
+    if user.role == 'admin':
+        return qs.filter(teacher__academy=user.academy)
+    if user.role == 'teacher':
+        return qs.filter(teacher=user)
+    return qs.none()
+
+
+def _get_visible_group(user, pk):
+    return get_object_or_404(_visible_groups_for(user), pk=pk)
+
+
+def _get_manageable_group(user, pk):
+    return get_object_or_404(_manageable_groups_for(user), pk=pk)
+
+
 # ── Groups ────────────────────────────────────────────────────────────────────
 
 class GroupListCreateView(generics.ListCreateAPIView):
@@ -54,11 +84,11 @@ class GroupDetailView(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = (permissions.IsAuthenticated,)
 
     def get_queryset(self):
-        return Group.objects.all()
+        return _visible_groups_for(self.request.user)
 
     def update(self, request, *args, **kwargs):
         group = self.get_object()
-        if group.teacher != request.user and request.user.role != 'admin':
+        if not _manageable_groups_for(request.user).filter(pk=group.pk).exists():
             return Response({'detail': 'Only the teacher or admin can edit this group.'}, status=403)
         if request.user.role == 'admin' and 'teacher' in request.data:
             from django.contrib.auth import get_user_model
@@ -75,7 +105,7 @@ class GroupDetailView(generics.RetrieveUpdateDestroyAPIView):
 
     def destroy(self, request, *args, **kwargs):
         group = self.get_object()
-        if group.teacher != request.user and request.user.role != 'admin':
+        if not _manageable_groups_for(request.user).filter(pk=group.pk).exists():
             return Response({'detail': 'Only the teacher or admin can delete this group.'}, status=403)
         return super().destroy(request, *args, **kwargs)
 
@@ -89,12 +119,19 @@ class JoinGroupView(APIView):
 
         if request.user.role == 'teacher':
             return Response({'detail': 'Teachers cannot join groups as students.'}, status=400)
+        if request.user.academy_id and request.user.academy_id != group.teacher.academy_id:
+            return Response({'detail': 'This account belongs to a different academy.'}, status=400)
 
         if GroupMembership.objects.filter(group=group, student=request.user).exists():
             return Response({'detail': 'Already a member.'}, status=400)
 
         if group.is_individual and group.memberships.exists():
             return Response({'detail': 'Individual group already has a student.'}, status=400)
+
+        if not request.user.academy_id:
+            request.user.academy = group.teacher.academy
+            request.user.role = 'student'
+            request.user.save(update_fields=['academy', 'role'])
 
         GroupMembership.objects.create(group=group, student=request.user)
 
@@ -110,12 +147,12 @@ class GroupMembersView(generics.ListAPIView):
     permission_classes = (permissions.IsAuthenticated,)
 
     def get_queryset(self):
-        group = get_object_or_404(Group, pk=self.kwargs['pk'])
+        group = _get_visible_group(self.request.user, self.kwargs['pk'])
         return group.memberships.select_related('student').filter(student__is_active=True)
 
     def get_serializer_context(self):
         ctx   = super().get_serializer_context()
-        group = get_object_or_404(Group, pk=self.kwargs['pk'])
+        group = _get_visible_group(self.request.user, self.kwargs['pk'])
 
         memberships  = list(group.memberships.select_related('student').filter(student__is_active=True))
         student_ids  = [m.student.id for m in memberships]
@@ -171,7 +208,7 @@ class LessonListCreateView(generics.ListCreateAPIView):
     permission_classes = (permissions.IsAuthenticated,)
 
     def get_queryset(self):
-        return Lesson.objects.filter(group_id=self.kwargs['group_pk'])
+        return Lesson.objects.filter(group__in=_visible_groups_for(self.request.user), group_id=self.kwargs['group_pk'])
 
     def list(self, request, *args, **kwargs):
         qs        = self.get_queryset()
@@ -185,10 +222,7 @@ class LessonListCreateView(generics.ListCreateAPIView):
         return Response({'results': data, 'total': total, 'pages': pages, 'page': page})
 
     def perform_create(self, serializer):
-        group = get_object_or_404(Group, pk=self.kwargs['group_pk'])
-        if group.teacher != self.request.user and self.request.user.role != 'admin':
-            from rest_framework.exceptions import PermissionDenied
-            raise PermissionDenied('Only the teacher or admin can add lessons.')
+        group = _get_manageable_group(self.request.user, self.kwargs['group_pk'])
         lesson = serializer.save(group=group)
         # Skip students who joined after this lesson's date, so a back-dated
         # lesson does not create attendance for members who were not yet in.
@@ -202,17 +236,17 @@ class LessonDetailView(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = (permissions.IsAuthenticated,)
 
     def get_queryset(self):
-        return Lesson.objects.filter(group_id=self.kwargs['group_pk'])
+        return Lesson.objects.filter(group__in=_visible_groups_for(self.request.user), group_id=self.kwargs['group_pk'])
 
     def update(self, request, *args, **kwargs):
         lesson = self.get_object()
-        if lesson.group.teacher != request.user and request.user.role != 'admin':
+        if not _manageable_groups_for(request.user).filter(pk=lesson.group_id).exists():
             return Response({'detail': 'Only the teacher or admin can edit lessons.'}, status=403)
         return super().update(request, *args, **kwargs)
 
     def destroy(self, request, *args, **kwargs):
         lesson = self.get_object()
-        if lesson.group.teacher != request.user and request.user.role != 'admin':
+        if not _manageable_groups_for(request.user).filter(pk=lesson.group_id).exists():
             return Response({'detail': 'Only the teacher or admin can delete lessons.'}, status=403)
         game = getattr(lesson, 'game', None)
         with transaction.atomic():
@@ -227,14 +261,12 @@ class AttendanceView(APIView):
     permission_classes = (permissions.IsAuthenticated,)
 
     def get(self, request, group_pk, lesson_pk):
-        lesson  = get_object_or_404(Lesson, pk=lesson_pk, group_id=group_pk)
+        lesson  = get_object_or_404(Lesson, pk=lesson_pk, group_id=group_pk, group__in=_visible_groups_for(request.user))
         records = Attendance.objects.filter(lesson=lesson).select_related('student')
         return Response(AttendanceSerializer(records, many=True).data)
 
     def post(self, request, group_pk, lesson_pk):
-        lesson = get_object_or_404(Lesson, pk=lesson_pk, group_id=group_pk)
-        if lesson.group.teacher != request.user and request.user.role != 'admin':
-            return Response({'detail': 'Only the teacher or admin can mark attendance.'}, status=403)
+        lesson = get_object_or_404(Lesson, pk=lesson_pk, group_id=group_pk, group__in=_manageable_groups_for(request.user))
 
         serializer = BulkAttendanceSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -255,14 +287,12 @@ class ScoreView(APIView):
     permission_classes = (permissions.IsAuthenticated,)
 
     def get(self, request, group_pk, lesson_pk):
-        lesson  = get_object_or_404(Lesson, pk=lesson_pk, group_id=group_pk)
+        lesson  = get_object_or_404(Lesson, pk=lesson_pk, group_id=group_pk, group__in=_visible_groups_for(request.user))
         records = Score.objects.filter(lesson=lesson).select_related('student')
         return Response(ScoreSerializer(records, many=True).data)
 
     def post(self, request, group_pk, lesson_pk):
-        lesson = get_object_or_404(Lesson, pk=lesson_pk, group_id=group_pk)
-        if lesson.group.teacher != request.user and request.user.role != 'admin':
-            return Response({'detail': 'Only the teacher or admin can enter scores.'}, status=403)
+        lesson = get_object_or_404(Lesson, pk=lesson_pk, group_id=group_pk, group__in=_manageable_groups_for(request.user))
 
         serializer = BulkScoreSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -283,7 +313,7 @@ class JournalView(APIView):
     permission_classes = (permissions.IsAuthenticated,)
 
     def get(self, request, group_pk, lesson_pk):
-        lesson = get_object_or_404(Lesson, pk=lesson_pk, group_id=group_pk)
+        lesson = get_object_or_404(Lesson, pk=lesson_pk, group_id=group_pk, group__in=_visible_groups_for(request.user))
         if lesson.group.teacher == request.user:
             records = Journal.objects.filter(lesson=lesson).select_related('student')
         else:
@@ -291,7 +321,7 @@ class JournalView(APIView):
         return Response(JournalSerializer(records, many=True).data)
 
     def post(self, request, group_pk, lesson_pk):
-        lesson = get_object_or_404(Lesson, pk=lesson_pk, group_id=group_pk)
+        lesson = get_object_or_404(Lesson, pk=lesson_pk, group_id=group_pk, group__in=_visible_groups_for(request.user))
         if request.user.role == 'teacher':
             return Response({'detail': 'Teachers do not submit journals.'}, status=400)
 
@@ -312,7 +342,7 @@ class HomeworkView(APIView):
     permission_classes = (permissions.IsAuthenticated,)
 
     def get(self, request, group_pk, lesson_pk):
-        lesson = get_object_or_404(Lesson, pk=lesson_pk, group_id=group_pk)
+        lesson = get_object_or_404(Lesson, pk=lesson_pk, group_id=group_pk, group__in=_visible_groups_for(request.user))
         if lesson.group.teacher == request.user:
             submissions = HomeworkSubmission.objects.filter(lesson=lesson).select_related('student')
         else:
@@ -323,7 +353,7 @@ class HomeworkView(APIView):
         })
 
     def post(self, request, group_pk, lesson_pk):
-        lesson = get_object_or_404(Lesson, pk=lesson_pk, group_id=group_pk)
+        lesson = get_object_or_404(Lesson, pk=lesson_pk, group_id=group_pk, group__in=_visible_groups_for(request.user))
 
         if request.user.role == 'teacher':
             if lesson.group.teacher != request.user:
@@ -353,9 +383,7 @@ class AddMemberDirectView(APIView):
     permission_classes = (permissions.IsAuthenticated,)
 
     def post(self, request, pk):
-        group = get_object_or_404(Group, pk=pk)
-        if group.teacher != request.user and request.user.role != 'admin':
-            return Response({'detail': 'Only teacher or admin.'}, status=403)
+        group = _get_manageable_group(request.user, pk)
 
         from django.contrib.auth import get_user_model
         User = get_user_model()
@@ -363,7 +391,7 @@ class AddMemberDirectView(APIView):
         if not user_id:
             return Response({'detail': 'user_id required.'}, status=400)
 
-        student = get_object_or_404(User, pk=user_id, role='student')
+        student = get_object_or_404(User, pk=user_id, role='student', academy=group.teacher.academy)
         if GroupMembership.objects.filter(group=group, student=student).exists():
             return Response({'detail': 'Already a member.'}, status=400)
 
@@ -378,9 +406,7 @@ class MembershipDetailView(APIView):
     permission_classes = (permissions.IsAuthenticated,)
 
     def patch(self, request, pk, member_pk):
-        group = get_object_or_404(Group, pk=pk)
-        if group.teacher != request.user and request.user.role != 'admin':
-            return Response({'detail': 'Only the teacher or admin can update membership.'}, status=403)
+        group = _get_manageable_group(request.user, pk)
         membership = get_object_or_404(GroupMembership, pk=member_pk, group=group)
 
         joined_at = request.data.get('joined_at')
@@ -425,9 +451,7 @@ class MembershipDetailView(APIView):
         return Response(data)
 
     def delete(self, request, pk, member_pk):
-        group = get_object_or_404(Group, pk=pk)
-        if group.teacher != request.user and request.user.role != 'admin':
-            return Response({'detail': 'Only the teacher or admin can remove students.'}, status=403)
+        group = _get_manageable_group(request.user, pk)
         membership = get_object_or_404(GroupMembership, pk=member_pk, group=group)
         membership.delete()
         return Response(status=204)
@@ -439,9 +463,7 @@ class EndLessonView(APIView):
     permission_classes = (permissions.IsAuthenticated,)
 
     def post(self, request, group_pk, lesson_pk):
-        lesson = get_object_or_404(Lesson, pk=lesson_pk, group_id=group_pk)
-        if lesson.group.teacher != request.user and request.user.role != 'admin':
-            return Response({'detail': 'Only the teacher or admin can end a lesson.'}, status=403)
+        lesson = get_object_or_404(Lesson, pk=lesson_pk, group_id=group_pk, group__in=_manageable_groups_for(request.user))
 
         if not lesson.ended_at:
             lesson.ended_at = timezone.now()
@@ -695,11 +717,13 @@ class AcademyAnnouncementView(APIView):
     permission_classes = (permissions.IsAuthenticated,)
 
     def get(self, request):
-        anns = Announcement.objects.filter(group=None)
+        if not request.user.academy_id:
+            return Response([])
+        anns = Announcement.objects.filter(group=None, author__academy=request.user.academy)
         return Response(AnnouncementSerializer(anns, many=True).data)
 
     def post(self, request):
-        if request.user.role != 'admin':
+        if request.user.role != 'admin' or not request.user.academy_id:
             return Response({'detail': 'Admin only.'}, status=403)
         ser = AnnouncementSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
@@ -738,18 +762,11 @@ class GroupAnnouncementView(APIView):
     permission_classes = (permissions.IsAuthenticated,)
 
     def get(self, request, pk):
-        group = get_object_or_404(Group, pk=pk)
-        is_member  = group.memberships.filter(student=request.user).exists()
-        is_teacher = group.teacher == request.user
-        is_admin   = request.user.role == 'admin'
-        if not (is_member or is_teacher or is_admin):
-            return Response({'detail': 'No access.'}, status=403)
+        group = _get_visible_group(request.user, pk)
         return Response(AnnouncementSerializer(group.announcements.all(), many=True).data)
 
     def post(self, request, pk):
-        group = get_object_or_404(Group, pk=pk)
-        if group.teacher != request.user and request.user.role != 'admin':
-            return Response({'detail': 'Teacher or admin only.'}, status=403)
+        group = _get_manageable_group(request.user, pk)
         ser = AnnouncementSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
         ann = ser.save(author=request.user, group=group)
@@ -769,7 +786,15 @@ class AnnouncementDeleteView(APIView):
 
     def delete(self, request, pk):
         ann = get_object_or_404(Announcement, pk=pk)
-        if ann.author != request.user and request.user.role != 'admin':
+        admin_can_delete = (
+            request.user.role == 'admin'
+            and request.user.academy_id
+            and (
+                (ann.group_id and ann.group.teacher.academy_id == request.user.academy_id)
+                or (not ann.group_id and ann.author.academy_id == request.user.academy_id)
+            )
+        )
+        if ann.author != request.user and not admin_can_delete:
             return Response({'detail': 'No permission.'}, status=403)
         ann.delete()
         return Response(status=204)
@@ -781,9 +806,7 @@ class GroupGraduateView(APIView):
     permission_classes = (permissions.IsAuthenticated,)
 
     def post(self, request, group_pk):
-        group = get_object_or_404(Group, pk=group_pk)
-        if group.teacher != request.user and request.user.role != 'admin':
-            return Response({'detail': 'Only the teacher or admin can graduate this group.'}, status=403)
+        group = _get_manageable_group(request.user, group_pk)
         group.is_graduated = not group.is_graduated
         group.save(update_fields=['is_graduated'])
         return Response({'is_graduated': group.is_graduated})
@@ -796,9 +819,7 @@ class GroupExamReadyView(APIView):
 
     def post(self, request, group_pk):
         from django.utils import timezone
-        group = get_object_or_404(Group, pk=group_pk)
-        if group.teacher != request.user and request.user.role != 'admin':
-            return Response({'detail': 'Only the teacher of this group can toggle exam readiness.'}, status=403)
+        group = _get_manageable_group(request.user, group_pk)
         group.exam_ready = not group.exam_ready
         update_fields = ['exam_ready']
 
@@ -868,12 +889,7 @@ class ExamListCreateView(APIView):
     permission_classes = (permissions.IsAuthenticated,)
 
     def get(self, request, group_pk):
-        group = get_object_or_404(Group, pk=group_pk)
-        is_admin   = request.user.role == 'admin'
-        is_teacher = group.teacher == request.user
-        is_member  = group.memberships.filter(student=request.user).exists()
-        if not (is_admin or is_teacher or is_member):
-            return Response({'detail': 'No access.'}, status=403)
+        group = _get_visible_group(request.user, group_pk)
         qs        = group.exams.prefetch_related('results__student').order_by('-created_at')
         page      = max(1, int(request.query_params.get('page', 1)))
         page_size = max(1, min(50, int(request.query_params.get('page_size', 10))))
@@ -889,9 +905,7 @@ class ExamListCreateView(APIView):
         })
 
     def post(self, request, group_pk):
-        group = get_object_or_404(Group, pk=group_pk)
-        if not (request.user.role == 'admin' or group.teacher == request.user):
-            return Response({'detail': 'Only the teacher or admin can create exams.'}, status=403)
+        group = _get_manageable_group(request.user, group_pk)
         ser = ExamSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
         exam = ser.save(group=group, created_by=request.user, status=Exam.ACTIVE)
@@ -904,22 +918,18 @@ class ExamDetailView(APIView):
     permission_classes = (permissions.IsAuthenticated,)
 
     def get(self, request, group_pk, exam_pk):
-        exam = get_object_or_404(Exam, pk=exam_pk, group_id=group_pk)
+        exam = get_object_or_404(Exam, pk=exam_pk, group_id=group_pk, group__in=_visible_groups_for(request.user))
         return Response(ExamSerializer(exam).data)
 
     def patch(self, request, group_pk, exam_pk):
-        exam = get_object_or_404(Exam, pk=exam_pk, group_id=group_pk)
-        if not (request.user.role == 'admin' or exam.group.teacher == request.user):
-            return Response({'detail': 'Only the teacher or admin.'}, status=403)
+        exam = get_object_or_404(Exam, pk=exam_pk, group_id=group_pk, group__in=_manageable_groups_for(request.user))
         if 'status' in request.data:
             exam.status = request.data['status']
             exam.save(update_fields=['status'])
         return Response(ExamSerializer(exam).data)
 
     def delete(self, request, group_pk, exam_pk):
-        exam = get_object_or_404(Exam, pk=exam_pk, group_id=group_pk)
-        if not (request.user.role == 'admin' or exam.group.teacher == request.user):
-            return Response({'detail': 'Only the teacher or admin can delete this exam.'}, status=403)
+        exam = get_object_or_404(Exam, pk=exam_pk, group_id=group_pk, group__in=_manageable_groups_for(request.user))
         exam.delete()
         return Response(status=204)
 
@@ -939,9 +949,7 @@ class ExamSubmitView(APIView):
     permission_classes = (permissions.IsAuthenticated,)
 
     def post(self, request, group_pk, exam_pk):
-        exam = get_object_or_404(Exam, pk=exam_pk, group_id=group_pk)
-        if not (request.user.role == 'admin' or exam.group.teacher == request.user):
-            return Response({'detail': 'Only the teacher or admin can submit exam results.'}, status=403)
+        exam = get_object_or_404(Exam, pk=exam_pk, group_id=group_pk, group__in=_manageable_groups_for(request.user))
         results_data = request.data.get('results', [])
         finish = request.data.get('finish', True)
         was_already_finished = exam.status == Exam.FINISHED
@@ -1174,13 +1182,7 @@ class ExportExcelView(APIView):
     permission_classes = (permissions.IsAuthenticated,)
 
     def get(self, request, pk):
-        group = get_object_or_404(Group, pk=pk)
-        user  = request.user
-
-        if user.role not in ('teacher', 'admin'):
-            return Response({'detail': 'Forbidden'}, status=403)
-        if user.role == 'teacher' and group.teacher != user:
-            return Response({'detail': 'Forbidden'}, status=403)
+        group = _get_manageable_group(request.user, pk)
 
         lessons     = list(group.lessons.order_by('date', 'created_at'))
         memberships = list(group.memberships.select_related('student').order_by('student__first_name', 'student__username'))
@@ -1336,13 +1338,7 @@ class ExamExportExcelView(APIView):
     permission_classes = (permissions.IsAuthenticated,)
 
     def get(self, request, group_pk, exam_pk):
-        group = get_object_or_404(Group, pk=group_pk)
-        user  = request.user
-
-        if user.role not in ('teacher', 'admin'):
-            return Response({'detail': 'Forbidden'}, status=403)
-        if user.role == 'teacher' and group.teacher != user:
-            return Response({'detail': 'Forbidden'}, status=403)
+        group = _get_manageable_group(request.user, group_pk)
 
         exam    = get_object_or_404(Exam, pk=exam_pk, group_id=group_pk)
         results = list(exam.results.select_related('student').all())

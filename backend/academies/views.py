@@ -184,7 +184,9 @@ class InviteCreateView(APIView):
         group = None
         if group_id:
             from groups.models import Group
-            group = get_object_or_404(Group, pk=group_id)
+            group = get_object_or_404(Group, pk=group_id, teacher__academy=academy)
+            if user.role == 'teacher' and group.teacher_id != user.id:
+                return Response({'detail': 'Teachers can only invite students to their own groups.'}, status=403)
 
         student = None
         if student_id and role == 'parent':
@@ -290,9 +292,10 @@ class InviteAcceptView(APIView):
         if invite.used_by.filter(pk=user.pk).exists():
             return Response({'detail': 'You have already used this invite.'}, status=400)
 
+        joining_new_academy = user.academy_id is None
         if user.academy_id is not None and user.academy_id != invite.academy_id:
             return Response({'detail': 'This account already belongs to a different academy. Log out and use a different account to accept this invite.'}, status=400)
-        if user.role != invite.role:
+        if not joining_new_academy and user.role != invite.role:
             return Response({'detail': f'This account is already registered as {user.get_role_display()}. Log out and create a separate account to accept this invite.'}, status=400)
 
         user.academy = invite.academy

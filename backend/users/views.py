@@ -24,6 +24,21 @@ logger = logging.getLogger(__name__)
 User = get_user_model()
 
 
+def _same_academy(viewer, target):
+    return bool(viewer.academy_id and viewer.academy_id == target.academy_id)
+
+
+def _can_view_user(viewer, target):
+    if viewer.pk == target.pk:
+        return True
+    if viewer.role in ('admin', 'teacher') and _same_academy(viewer, target):
+        return True
+    if viewer.role == 'parent' and target.role == 'student':
+        from .models import ParentStudent
+        return ParentStudent.objects.filter(parent=viewer, student=target).exists()
+    return False
+
+
 class RegisterView(generics.CreateAPIView):
     queryset = User.objects.all()
     serializer_class = RegisterSerializer
@@ -65,6 +80,9 @@ class ProfileView(generics.RetrieveAPIView):
     def get_object(self):
         target = super().get_object()
         viewer = self.request.user
+        if not _can_view_user(viewer, target):
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied('You do not have permission to view this profile.')
         # Admin/teacher profiles are private — only admins, teachers, or the owner can view
         if target.role in ('admin', 'teacher') and viewer.role not in ('admin', 'teacher') and viewer.pk != target.pk:
             from rest_framework.exceptions import PermissionDenied
@@ -109,6 +127,8 @@ class UserStatsView(APIView):
             user = User.objects.get(pk=pk)
         except User.DoesNotExist:
             return Response({'detail': 'Not found.'}, status=404)
+        if not _can_view_user(request.user, user):
+            return Response({'detail': 'No permission.'}, status=403)
 
         from django.db.models import Avg, Count, Sum
         from groups.models import Score, Attendance, Group, GroupMembership, Lesson
@@ -280,6 +300,8 @@ class UserGroupsView(APIView):
             target = User.objects.get(pk=pk)
         except User.DoesNotExist:
             return Response({'detail': 'Not found.'}, status=404)
+        if not _can_view_user(viewer, target):
+            return Response({'detail': 'No permission.'}, status=403)
 
         from groups.models import Group, GroupMembership
         if target.role == 'student':
@@ -439,7 +461,10 @@ class UserChildrenView(APIView):
         if viewer.pk != pk and viewer.role not in ('admin', 'teacher'):
             return Response({'detail': 'No permission.'}, status=403)
         from .models import ParentStudent
-        links = ParentStudent.objects.filter(parent_id=pk).select_related('student')
+        parent = get_object_or_404(User, pk=pk, role='parent')
+        if not _can_view_user(viewer, parent):
+            return Response({'detail': 'No permission.'}, status=403)
+        links = ParentStudent.objects.filter(parent=parent).select_related('student')
         children = []
         for link in links:
             s = link.student
@@ -975,6 +1000,8 @@ class UserNotifyView(APIView):
         if not self._check_permission(request) and request.user.pk != pk:
             return Response(status=403)
         student = get_object_or_404(User, pk=pk, role='student')
+        if not _can_view_user(request.user, student):
+            return Response(status=403)
         parents = []
         for ps in student.parents.select_related('parent').all():
             p = ps.parent
@@ -996,6 +1023,8 @@ class UserNotifyView(APIView):
         if not self._check_permission(request):
             return Response(status=403)
         student = get_object_or_404(User, pk=pk, role='student')
+        if not _can_view_user(request.user, student):
+            return Response(status=403)
 
         message    = request.data.get('message', '').strip()
         recipients = request.data.get('recipients', [])
@@ -1034,8 +1063,10 @@ class UserNotifyView(APIView):
         parent_ids = [r for r in recipients if isinstance(r, int)]
         for parent_id in parent_ids:
             try:
-                parent = User.objects.get(pk=parent_id, role='parent')
+                parent = User.objects.get(pk=parent_id, role='parent', academy=request.user.academy)
             except User.DoesNotExist:
+                continue
+            if not parent.children.filter(student=student).exists():
                 continue
             Notification.objects.create(
                 user=parent, type='lesson',
@@ -1113,5 +1144,3 @@ class PushSubscribeView(APIView):
         if endpoint:
             PushSubscription.objects.filter(user=request.user, endpoint=endpoint).delete()
         return Response(status=204)
-
-

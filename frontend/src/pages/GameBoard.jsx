@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next'
 import { Crown, ChevronRight, RotateCcw, Trophy, Zap, Check, X, Loader2, Lightbulb, Flag, Users, Clock, HelpCircle, AlertTriangle, XCircle, KeyRound } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
-import { getGame, startGame, pickSquare, answerQuestion, finishGame, resetGame, swapTeamMembers, reshuffleTeams } from '../api/quiz'
+import { getGame, startGame, pickSquare, answerQuestion, finishGame, resetGame, swapTeamMembers, reshuffleTeams, placeBet, answerFinal } from '../api/quiz'
 
 const DIFF_COLOR = { easy: '#22C55E', medium: '#F59E0B', hard: '#EF4444' }
 const TEAM_COLORS = ['#6366F1', '#F59E0B', '#22C55E', '#EF4444', '#8B5CF6', '#EC4899']
@@ -41,7 +41,9 @@ function playSound(type) {
       o.connect(g); o.start(); o.stop(ctx.currentTime + 0.3)
     }
     setTimeout(() => ctx.close(), 2000)
-  } catch {}
+  } catch {
+    // Audio playback can be blocked by the browser until the user interacts.
+  }
 }
 
 // ── Typewriter text ────────────────────────────────────────────────────────────

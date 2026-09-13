@@ -3,21 +3,29 @@ from pathlib import Path
 from datetime import timedelta
 import dj_database_url
 from dotenv import load_dotenv
+from django.core.exceptions import ImproperlyConfigured
 
 load_dotenv(Path(__file__).resolve().parent.parent / '.env')
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # ── Security ──────────────────────────────────────────────────────────────────
-SECRET_KEY               = os.environ.get('SECRET_KEY', 'django-insecure-eagy6i18qj6t37kgub_r=g+&i3s_fx$rywr@fk%oup_$s#ql_!')
+DEFAULT_SECRET_KEY       = 'django-insecure-eagy6i18qj6t37kgub_r=g+&i3s_fx$rywr@fk%oup_$s#ql_!'
+SECRET_KEY               = os.environ.get('SECRET_KEY', DEFAULT_SECRET_KEY)
 DEBUG                    = os.environ.get('DEBUG', 'true').lower() == 'true'
 # Railway assigns each service a public subdomain at deploy time and exposes
 # it via this variable — fold it in automatically so ALLOWED_HOSTS/CORS/CSRF
 # don't need updating by hand whenever that subdomain changes.
 RAILWAY_PUBLIC_DOMAIN    = os.environ.get('RAILWAY_PUBLIC_DOMAIN', '')
-ALLOWED_HOSTS            = [h for h in os.environ.get('ALLOWED_HOSTS', '*').split(',') if h]
+_allowed_hosts_raw       = os.environ.get('ALLOWED_HOSTS', '*' if DEBUG else '')
+ALLOWED_HOSTS            = [h.strip() for h in _allowed_hosts_raw.split(',') if h.strip()]
 if RAILWAY_PUBLIC_DOMAIN and RAILWAY_PUBLIC_DOMAIN not in ALLOWED_HOSTS:
     ALLOWED_HOSTS.append(RAILWAY_PUBLIC_DOMAIN)
+if not DEBUG:
+    if SECRET_KEY == DEFAULT_SECRET_KEY:
+        raise ImproperlyConfigured('SECRET_KEY must be set in production.')
+    if not ALLOWED_HOSTS or '*' in ALLOWED_HOSTS:
+        raise ImproperlyConfigured('ALLOWED_HOSTS must be explicitly set in production.')
 TELEGRAM_BOT_TOKEN       = os.environ.get('TELEGRAM_BOT_TOKEN', '')
 TELEGRAM_WEBHOOK_SECRET  = os.environ.get('TELEGRAM_WEBHOOK_SECRET', '')
 VAPID_PRIVATE_KEY        = os.environ.get('VAPID_PRIVATE_KEY', '')

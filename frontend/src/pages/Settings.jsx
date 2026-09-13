@@ -528,7 +528,9 @@ function MembersTab({ userRole }) {
       setTotalPages(data.pages)
       setTotal(data.total)
       setPage(data.page)
-    } catch {}
+    } catch {
+      show(t('common.error'), 'error')
+    }
     finally { setLoading(false) }
   }, [])
 

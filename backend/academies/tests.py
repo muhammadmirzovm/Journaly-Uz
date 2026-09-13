@@ -4,6 +4,7 @@ from django.utils import timezone
 from datetime import timedelta
 from rest_framework.test import APIClient
 from academies.models import Academy, InviteToken
+from groups.models import Group
 
 User = get_user_model()
 
@@ -117,6 +118,52 @@ def test_invite_list_scoped_to_own_academy(academy, other_academy, admin):
 
     res = client.get('/api/invites/')
     assert res.data['total'] == 1
+
+
+@pytest.mark.django_db
+def test_invite_create_rejects_group_from_another_academy(academy, other_academy, admin):
+    other_teacher = User.objects.create_user(
+        username='other_academy_teacher', password='pass1234', role='teacher', academy=other_academy,
+    )
+    other_group = Group.objects.create(name='Other Group', teacher=other_teacher)
+    client = _client_for('admin1')
+
+    res = client.post('/api/invites/create/', {
+        'role': 'student',
+        'group': other_group.id,
+    })
+
+    assert res.status_code == 404
+    assert not InviteToken.objects.filter(group=other_group, academy=academy).exists()
+
+
+@pytest.mark.django_db
+def test_teacher_invite_create_rejects_other_teachers_group(academy, teacher, other_teacher):
+    other_group = Group.objects.create(name='Other Teacher Group', teacher=other_teacher)
+    client = _client_for('teacher1')
+
+    res = client.post('/api/invites/create/', {
+        'role': 'student',
+        'group': other_group.id,
+    })
+
+    assert res.status_code == 403
+    assert not InviteToken.objects.filter(group=other_group, created_by=teacher).exists()
+
+
+@pytest.mark.django_db
+def test_invite_accept_can_set_role_for_new_account(academy, admin):
+    invite = _make_invite(academy, admin, role='teacher')
+    new_user = User.objects.create_user(username='new_teacher', password='pass1234', role='student')
+    client = APIClient()
+    client.force_authenticate(new_user)
+
+    res = client.post(f'/api/invites/{invite.token}/accept/')
+
+    assert res.status_code == 200
+    new_user.refresh_from_db()
+    assert new_user.role == 'teacher'
+    assert new_user.academy == academy
 
 
 @pytest.mark.django_db

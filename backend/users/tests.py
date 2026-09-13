@@ -60,6 +60,73 @@ def test_register(client):
 
 
 @pytest.mark.django_db
+def test_register_ignores_requested_privileged_role(client):
+    res = client.post('/api/auth/register/', {
+        'username': 'role_hopper',
+        'password': 'pass1234',
+        'role': 'admin',
+    })
+    assert res.status_code == 201
+    assert User.objects.get(username='role_hopper').role == 'student'
+    assert res.data['user']['role'] == 'student'
+
+
+@pytest.mark.django_db
+def test_me_patch_cannot_change_role_academy_or_telegram(admin_user):
+    from academies.models import Academy
+
+    other_academy = Academy.objects.create(name='Other Academy', slug='other-academy')
+    client = APIClient()
+    client.force_authenticate(admin_user)
+
+    res = client.patch('/api/auth/me/', {
+        'first_name': 'Updated',
+        'role': 'student',
+        'academy': other_academy.id,
+        'telegram_id': 123456,
+    }, format='json')
+
+    assert res.status_code == 200
+    admin_user.refresh_from_db()
+    assert admin_user.first_name == 'Updated'
+    assert admin_user.role == 'admin'
+    assert admin_user.academy.slug == 'test-academy'
+    assert admin_user.telegram_id is None
+
+
+@pytest.mark.django_db
+def test_profile_rejects_student_from_other_academy(admin_user):
+    from academies.models import Academy
+
+    other_academy = Academy.objects.create(name='Other Academy', slug='other-profile-academy')
+    other_student = User.objects.create_user(
+        username='other_profile_student', password='pass1234', role='student', academy=other_academy,
+    )
+    client = APIClient()
+    client.force_authenticate(admin_user)
+
+    res = client.get(f'/api/auth/users/{other_student.id}/')
+
+    assert res.status_code == 403
+
+
+@pytest.mark.django_db
+def test_user_stats_rejects_student_from_other_academy(admin_user):
+    from academies.models import Academy
+
+    other_academy = Academy.objects.create(name='Other Academy', slug='other-stats-academy')
+    other_student = User.objects.create_user(
+        username='other_stats_student', password='pass1234', role='student', academy=other_academy,
+    )
+    client = APIClient()
+    client.force_authenticate(admin_user)
+
+    res = client.get(f'/api/auth/users/{other_student.id}/stats/')
+
+    assert res.status_code == 403
+
+
+@pytest.mark.django_db
 def test_login(client, admin_user):
     res = client.post('/api/auth/login/', {'username': 'admin1', 'password': 'pass1234'})
     assert res.status_code == 200

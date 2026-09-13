@@ -24,6 +24,11 @@ const MIN_PX_PER_POINT = 40
 
 export default function ScoreLineChart({ data }) {
   const { i18n } = useTranslation()
+  const scrollRef = useRef(null)
+
+  useEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollLeft = scrollRef.current.scrollWidth
+  }, [data])
 
   if (!data || data.length === 0) {
     return (
@@ -43,11 +48,6 @@ export default function ScoreLineChart({ data }) {
   const minWidth = Math.max(chartData.length * MIN_PX_PER_POINT, 300)
   const dotR = chartData.length > 30 ? 2.5 : 4
   const tickInterval = chartData.length > 20 ? Math.floor(chartData.length / 10) : 0
-
-  const scrollRef = useRef(null)
-  useEffect(() => {
-    if (scrollRef.current) scrollRef.current.scrollLeft = scrollRef.current.scrollWidth
-  }, [data])
 
   return (
     <div ref={scrollRef} style={{ overflowX: 'auto', width: '100%' }}>

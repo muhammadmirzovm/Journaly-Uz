@@ -418,7 +418,9 @@ export default function ExamsTab({ group, members, isAdmin, isTeacher, userId, g
       setExams(data.results)
       setTotalPages(data.pages)
       setPage(data.page)
-    } catch {}
+    } catch {
+      show(t('common.error'), 'error')
+    }
     finally { setLoadingExams(false) }
   }, [groupId])
 
@@ -442,7 +444,9 @@ export default function ExamsTab({ group, members, isAdmin, isTeacher, userId, g
       setExamReadyAt(data.exam_ready_at || null)
       setExamReadyNote(data.exam_ready_note || '')
       if (data.exam_ready) show(t('exam.ready_toast'), 'success')
-    } catch {}
+    } catch {
+      show(t('common.error'), 'error')
+    }
     finally { setReadyLoading(false) }
   }
 

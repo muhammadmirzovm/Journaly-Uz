@@ -52,7 +52,7 @@ class TopicDetailView(generics.RetrieveUpdateDestroyAPIView):
 
     def get_queryset(self):
         if self.request.user.role == 'admin':
-            return Topic.objects.all()
+            return Topic.objects.filter(created_by__academy=self.request.user.academy)
         return Topic.objects.filter(created_by=self.request.user)
 
 
@@ -64,6 +64,10 @@ class QuestionListCreateView(generics.ListCreateAPIView):
 
     def get_queryset(self):
         qs = Question.objects.all().select_related('topic', 'created_by')
+        if self.request.user.academy_id:
+            qs = qs.filter(created_by__academy=self.request.user.academy)
+        else:
+            qs = qs.filter(created_by=self.request.user)
         if owner := self.request.query_params.get('owner'):
             qs = qs.filter(created_by_id=owner)
         if t := self.request.query_params.get('topic'):
@@ -82,7 +86,7 @@ class QuestionDetailView(generics.RetrieveUpdateDestroyAPIView):
 
     def get_queryset(self):
         if self.request.user.role == 'admin':
-            return Question.objects.all()
+            return Question.objects.filter(created_by__academy=self.request.user.academy)
         return Question.objects.filter(created_by=self.request.user)
 
 
@@ -293,7 +297,12 @@ class QuestionBankListView(APIView):
     permission_classes = [IsTeacher]
 
     def get(self, request):
-        teacher_ids = Question.objects.values_list('created_by_id', flat=True).distinct()
+        questions = Question.objects.all()
+        if request.user.academy_id:
+            questions = questions.filter(created_by__academy=request.user.academy)
+        else:
+            questions = questions.filter(created_by=request.user)
+        teacher_ids = questions.values_list('created_by_id', flat=True).distinct()
         teachers = User.objects.filter(id__in=teacher_ids).annotate(
             question_count=Count('questions', distinct=True),
             topic_count=Count('topics', distinct=True),
@@ -316,8 +325,15 @@ class QuestionBankListView(APIView):
 
 def get_group_and_check_teacher(group_pk, user):
     from groups.models import Group
-    group = get_object_or_404(Group, pk=group_pk)
-    is_teacher = group.teacher == user or user.role == 'admin'
+    qs = Group.objects.select_related('teacher')
+    if user.role == 'admin':
+        qs = qs.filter(teacher__academy=user.academy)
+    elif user.role == 'teacher':
+        qs = qs.filter(teacher=user)
+    else:
+        qs = qs.filter(memberships__student=user)
+    group = get_object_or_404(qs.distinct(), pk=group_pk)
+    is_teacher = group.teacher == user or (user.role == 'admin' and group.teacher.academy_id == user.academy_id)
     return group, is_teacher
 
 

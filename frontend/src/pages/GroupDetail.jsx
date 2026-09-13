@@ -477,7 +477,7 @@ export default function GroupDetail() {
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {games.map((g, i) => <GameRow key={g.id} game={g} groupId={id} index={i} isTeacher={isTeacher}
-                onDelete={async () => { try { await deleteGame(id, g.id); setGames(gs => gs.filter(x => x.id !== g.id)) } catch {} }}
+                onDelete={async () => { try { await deleteGame(id, g.id); setGames(gs => gs.filter(x => x.id !== g.id)) } catch { show(t('common.error'), 'error') } }}
                 onDuplicated={copy => setGames(gs => [copy, ...gs])} />)}
             </div>
           )}
@@ -1035,7 +1035,7 @@ function AddStudentModal({ open, onClose, groupId, onAdded }) {
       try {
         const { data } = await searchStudents(query)
         setResults(data.results || data)
-      } catch {} finally { setLoading(false) }
+      } catch { setResults([]) } finally { setLoading(false) }
     }, 300)
     return () => clearTimeout(timer)
   }, [query])
