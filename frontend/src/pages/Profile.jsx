@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
@@ -78,7 +78,7 @@ export default function Profile() {
       }
     }).catch(() => show(t('profile.fail_load'), 'error'))
     .finally(() => setLoading(false))
-  }, [id])
+  }, [id, me?.id, me?.role, navigate, show, t])
 
   const setField = (k, v) => setEditForm(f => ({ ...f, [k]: v }))
 
@@ -654,7 +654,7 @@ function SendNotificationModal({ studentId, studentName, onClose, t, show }) {
       show(t('profile.notify_toast_fail'), 'error')
       onClose()
     }).finally(() => setLoading(false))
-  }, [studentId])
+  }, [onClose, show, studentId, t])
 
   const toggle = key => setSelected(prev =>
     prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]

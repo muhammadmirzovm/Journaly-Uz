@@ -36,7 +36,7 @@ export default function ReceiptPreviewModal({ payment, onClose }) {
       cancelled = true
       if (objectUrl) URL.revokeObjectURL(objectUrl)
     }
-  }, [payment])
+  }, [payment, show, t])
 
   if (!payment) return null
 

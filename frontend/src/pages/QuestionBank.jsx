@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
 import { Plus, Trash2, Pencil, BookOpen, Loader2, X, Check, ChevronLeft, ChevronRight, Download, Upload, AlertTriangle, Search, ChevronDown } from 'lucide-react'
@@ -48,21 +48,21 @@ export default function QuestionBank() {
     getQuestionBanks().then(res => setBanks(res.data)).catch(() => {})
   }, [])
 
-  const load = async () => {
+  const load = useCallback(async ({ bank, topic, diff }) => {
     setLoading(true)
     try {
       const [tRes, qRes] = await Promise.all([
-        getTopics(selBank ? { owner: selBank } : undefined),
-        getQuestions({ owner: selBank || undefined, topic: selTopic || undefined, difficulty: selDiff || undefined }),
+        getTopics(bank ? { owner: bank } : undefined),
+        getQuestions({ owner: bank || undefined, topic: topic || undefined, difficulty: diff || undefined }),
       ])
       setTopics(tRes.data)
       setQuestions(qRes.data)
     } catch { show(t('quiz.toast_load_fail'), 'error') }
     finally { setLoading(false) }
-  }
+  }, [show, t])
 
-  useEffect(() => { setPage(1); setSelTopic(null); load() }, [selBank])
-  useEffect(() => { setPage(1); load() }, [selTopic, selDiff])
+  useEffect(() => { setPage(1); setSelTopic(null) }, [selBank])
+  useEffect(() => { setPage(1); load({ bank: selBank, topic: selTopic, diff: selDiff }) }, [load, selBank, selDiff, selTopic])
 
   const refreshTopics = () =>
     getTopics(selBank ? { owner: selBank } : undefined).then(r => setTopics(r.data)).catch(() => {})
@@ -133,7 +133,7 @@ export default function QuestionBank() {
       const { data } = await importQuestions(file)
       setImportResult(data)
       if (data.created > 0) {
-        load()
+        load({ bank: selBank, topic: selTopic, diff: selDiff })
         refreshTopics()
       }
     } catch (err) {
@@ -531,7 +531,7 @@ function QuestionForm({ editing, topics, defaults, onSave, onClose }) {
       setForm(makeBlank(defaults))
     }
     setError('')
-  }, [editing])
+  }, [defaults, editing])
 
   const set    = (key, val) => { setForm(f => ({ ...f, [key]: val })); setError('') }
   const setOpt = (key, val) => setForm(f => ({ ...f, options: { ...f.options, [key]: val } }))

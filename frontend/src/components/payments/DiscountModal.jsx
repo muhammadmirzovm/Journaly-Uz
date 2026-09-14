@@ -25,7 +25,7 @@ export default function DiscountModal({ row, onClose, onSaved, t }) {
       })
       .catch(() => show(t('payments.toast_load_fail'), 'error'))
       .finally(() => setLoading(false))
-  }, [row])
+  }, [row, show, t])
 
   if (!row) return null
 

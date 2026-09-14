@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
 import { Gift, Plus, Minus, Loader2, Coins, Pencil, Trash2, ShoppingCart, Receipt, Copy, Check } from 'lucide-react'
@@ -40,11 +40,11 @@ export default function Rewards() {
   const [myPurchases, setMyPurchases]     = useState([])
   const [purchasesLoading, setPurchasesLoading] = useState(false)
 
-  const load = () => {
+  const load = useCallback(() => {
     setLoading(true)
     getRewards().then(r => setRewards(r.data)).catch(() => show(t('rewards.toast_load_fail'), 'error')).finally(() => setLoading(false))
-  }
-  useEffect(load, [])
+  }, [show, t])
+  useEffect(load, [load])
 
   const loadBalance = () => {
     if (!isStudent) return

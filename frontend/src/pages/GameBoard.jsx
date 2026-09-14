@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
@@ -58,7 +58,7 @@ function Typewriter({ text, speed = 22 }) {
       if (i >= text.length) clearInterval(id)
     }, speed)
     return () => clearInterval(id)
-  }, [text])
+  }, [text, speed])
   return <span>{shown}</span>
 }
 
@@ -83,7 +83,7 @@ function TimerRing({ seconds, total, onTick }) {
 
 // ── STOLEN! flash ─────────────────────────────────────────────────────────────
 function StolenFlash({ teamColor, teamName, onDone }) {
-  useEffect(() => { playSound('steal'); const t = setTimeout(onDone, 1800); return () => clearTimeout(t) }, [])
+  useEffect(() => { playSound('steal'); const t = setTimeout(onDone, 1800); return () => clearTimeout(t) }, [onDone])
   return (
     <motion.div initial={{ opacity: 0, scale: 0.5 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 1.3 }}
       transition={{ type: 'spring', stiffness: 400, damping: 20 }}
@@ -291,7 +291,7 @@ function QuestionOverlay({ question, team, timerTotal, isTeacher, teams, groupId
       setTimeLeft(s => { if (s <= 1) { clearInterval(intervalRef.current); return 0 } return s - 1 })
     }, 1000)
     return () => clearInterval(intervalRef.current)
-  }, [question?.id])
+  }, [question?.id, timerTotal])
 
   const markAnswer = async (correct, stealTeamId = null, partialPct = null) => {
     clearInterval(intervalRef.current)
@@ -664,13 +664,13 @@ export default function GameBoard() {
 
   const isTeacher = user?.role === 'teacher'
 
-  const load = async () => {
+  const load = useCallback(async () => {
     try { const { data } = await getGame(groupId, gameId); setGame(data) }
     catch { show(t('quiz.toast_load_fail'), 'error') }
     finally { setLoading(false) }
-  }
+  }, [gameId, groupId, show, t])
 
-  useEffect(() => { load() }, [gameId])
+  useEffect(() => { load() }, [load])
 
   const handleStart = async () => {
     try {

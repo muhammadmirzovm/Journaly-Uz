@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
@@ -43,31 +43,31 @@ export default function Payments() {
 
   const [receiptFor, setReceiptFor] = useState(null)
 
-  const loadStatic = () => {
+  const loadStatic = useCallback(() => {
     Promise.all([getGroups(), getTuitionCategories(), getTuitionTemplates()])
       .then(([g, c, tpl]) => { setGroups(g.data); setCategories(c.data); setTemplates(tpl.data) })
       .catch(() => show(t('payments.toast_load_fail'), 'error'))
-  }
+  }, [show, t])
 
-  const loadBalances = () => {
+  const loadBalances = useCallback(() => {
     setLoading(true)
     getBalances({})
       .then(r => { setBalanceGroups(r.data.groups); setSummary(r.data.summary) })
       .catch(() => show(t('payments.toast_load_fail'), 'error'))
       .finally(() => setLoading(false))
-  }
+  }, [show, t])
 
-  const loadHistory = () => {
+  const loadHistory = useCallback(() => {
     setHistoryLoading(true)
     getPaymentHistory({ page: historyPage, page_size: 20 })
       .then(r => { setHistory(r.data.results); setHistoryPages(r.data.pages) })
       .catch(() => show(t('payments.toast_load_fail'), 'error'))
       .finally(() => setHistoryLoading(false))
-  }
+  }, [historyPage, show, t])
 
-  useEffect(loadStatic, [])
-  useEffect(loadBalances, [])
-  useEffect(loadHistory, [historyPage])
+  useEffect(loadStatic, [loadStatic])
+  useEffect(loadBalances, [loadBalances])
+  useEffect(loadHistory, [loadHistory])
 
   return (
     <div style={{ maxWidth: 1100, margin: '0 auto' }}>

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, Link, useNavigate, useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
@@ -177,7 +177,7 @@ export default function GroupDetail() {
     return () => document.removeEventListener('mousedown', handler)
   }, [])
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true)
     try {
       const [g, m, l, gm, anns] = await Promise.all([
@@ -189,7 +189,7 @@ export default function GroupDetail() {
       setAnnouncements(anns.data)
     } catch { show(t('group_detail.toast_load_fail'), 'error') }
     finally { setLoading(false) }
-  }
+  }, [id, show, t])
 
   const handlePostGroupAnn = async data => {
     const { data: ann } = await createGroupAnnouncement(id, data)
@@ -203,7 +203,7 @@ export default function GroupDetail() {
     show(t('ann.toast_deleted'), 'success')
   }
 
-  useEffect(() => { load() }, [id])
+  useEffect(() => { load() }, [load])
 
   const copy = () => { navigator.clipboard.writeText(group.join_key); setCopied(true); setTimeout(() => setCopied(false), 2000) }
 

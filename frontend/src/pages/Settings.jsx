@@ -221,7 +221,7 @@ function AcademyTab({ academy, onUpdated }) {
 
   useEffect(() => {
     api.get('/academy/telegram-groups/').then(r => setTgGroups(r.data)).catch(() => {})
-  }, [])
+  }, [show, t])
 
   const addTgGroup = async e => {
     e.preventDefault()
@@ -532,7 +532,7 @@ function MembersTab({ userRole }) {
       show(t('common.error'), 'error')
     }
     finally { setLoading(false) }
-  }, [])
+  }, [show, t])
 
   useEffect(() => { fetchPage(1, '', '') }, [fetchPage])
 
@@ -826,13 +826,13 @@ function InvitesTab({ academy, userRole }) {
     (ROLE_OPTIONS_BY_ROLE[userRole] || ['student', 'parent']).includes(r.value)
   )
 
-  const fetchInvites = async (page) => {
+  const fetchInvites = useCallback(async (page) => {
     const params = { page }
     if (filterSearch.trim()) params.search = filterSearch.trim()
     if (filterRole) params.role = filterRole
     const { data } = await api.get('/invites/', { params })
     setInvites(data.results); setInvitePages(data.pages); setInvitePage(data.page)
-  }
+  }, [filterRole, filterSearch])
 
   useEffect(() => {
     Promise.all([
@@ -850,7 +850,7 @@ function InvitesTab({ academy, userRole }) {
     if (!didMountFilters.current) { didMountFilters.current = true; return }
     const timer = setTimeout(() => { fetchInvites(1) }, 350)
     return () => clearTimeout(timer)
-  }, [filterSearch, filterRole])
+  }, [fetchInvites, filterSearch, filterRole])
 
   const handleDeleteInvite = async (id) => {
     try {
@@ -1242,7 +1242,7 @@ export default function Settings() {
     } else {
       setFetched(true)
     }
-  }, [user?.id])
+  }, [user])
 
   if (!user) return null
 

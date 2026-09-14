@@ -411,7 +411,7 @@ export default function ExamsTab({ group, members, isAdmin, isTeacher, userId, g
 
   const activeExam = view ? exams.find(e => e.id === view.examId) : null
 
-  const fetchExams = useCallback(async (p = page) => {
+  const fetchExams = useCallback(async (p = 1) => {
     setLoadingExams(true)
     try {
       const { data } = await getExams(groupId, p)
@@ -422,7 +422,7 @@ export default function ExamsTab({ group, members, isAdmin, isTeacher, userId, g
       show(t('common.error'), 'error')
     }
     finally { setLoadingExams(false) }
-  }, [groupId])
+  }, [groupId, show, t])
 
   useEffect(() => { fetchExams(1) }, [fetchExams])
 

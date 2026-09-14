@@ -75,7 +75,7 @@ export default function LessonDetail() {
       getLesson(groupId, lessonId).then(r => setLesson(r.data))
     }).catch(() => show(t('lesson.toast_fail_load'), 'error'))
     .finally(() => setLoading(false))
-  }, [groupId, lessonId])
+  }, [groupId, lessonId, show, t])
 
   if (loading) return <Spinner />
   if (!group) return <p style={{ color: 'var(--text-muted)' }}>{t('lesson.toast_fail_load')}</p>
@@ -400,7 +400,7 @@ function JournalTab({ journal, groupId, lessonId, isTeacher, onSaved }) {
   const [body, setBody]     = useState(journal[0]?.body || '')
   const [saving, setSaving] = useState(false)
 
-  useEffect(() => { if (!isTeacher) setBody(journal[0]?.body || '') }, [journal])
+  useEffect(() => { if (!isTeacher) setBody(journal[0]?.body || '') }, [isTeacher, journal])
 
   const save = async () => {
     if (!body.trim()) { show(t('lesson.err_journal_empty'), 'error'); return }
@@ -478,7 +478,7 @@ function HomeworkTab({ homework, groupId, lessonId, isTeacher, onSaved }) {
   useEffect(() => {
     setAssignment(homework.assignment || '')
     if (!isTeacher) setBody(homework.submissions[0]?.body || '')
-  }, [homework])
+  }, [homework, isTeacher])
 
   const saveAssignment = async () => {
     setSavingAssignment(true)

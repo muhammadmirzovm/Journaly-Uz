@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
@@ -24,11 +24,11 @@ export default function Groups() {
   const [teacherFilter, setTeacherFilter] = useState('all')
   const [category, setCategory]     = useState('all')
 
-  const load = () => {
+  const load = useCallback(() => {
     setLoading(true)
     getGroups().then(r => setGroups(r.data)).catch(() => show(t('groups.toast_load_fail'), 'error')).finally(() => setLoading(false))
-  }
-  useEffect(load, [])
+  }, [show, t])
+  useEffect(load, [load])
 
   const teachers = useMemo(() => {
     if (!isAdmin) return []

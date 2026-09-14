@@ -53,7 +53,7 @@ export default function Students() {
     } catch {
       show('Error loading students', 'error')
     } finally { setLoading(false) }
-  }, [page, search, groupId, status])
+  }, [groupId, page, search, show, status])
 
   const handleToggleActive = async (e, s) => {
     e.stopPropagation()
@@ -75,9 +75,9 @@ export default function Students() {
   useEffect(() => {
     const timer = setTimeout(() => { setPage(1); fetchStudents(1) }, 300)
     return () => clearTimeout(timer)
-  }, [search, groupId, status])
+  }, [fetchStudents, groupId, search, status])
 
-  useEffect(() => { fetchStudents(page) }, [page])
+  useEffect(() => { fetchStudents(page) }, [fetchStudents, page])
 
   if (!['admin', 'teacher'].includes(user?.role)) return null
 

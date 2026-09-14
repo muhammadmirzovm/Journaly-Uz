@@ -91,7 +91,7 @@ export default function Dashboard() {
     } else {
       getGroups().then(r => setGroups(r.data)).finally(() => setLoading(false))
     }
-  }, [role])
+  }, [isParent, role])
 
   const handleJoin = async e => {
     e.preventDefault()

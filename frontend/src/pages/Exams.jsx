@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
@@ -35,16 +35,16 @@ export default function Exams() {
   const isTeacher = user?.role === 'teacher'
   const isStudent = user?.role === 'student'
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true)
     try {
       const { data: d } = await getUpcomingExams()
       setData(d)
     } catch { show('Error loading exams', 'error') }
     finally { setLoading(false) }
-  }
+  }, [show])
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [load])
 
   const handleCreate = async e => {
     e.preventDefault()

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { ArrowLeft, Wallet, Users, TrendingDown, Receipt, Search, CreditCard, Percent, Loader2, ArrowUp, ArrowDown, ArrowUpDown, Download } from 'lucide-react'
@@ -37,30 +37,30 @@ export default function GroupPayments() {
   const [receiptFor, setReceiptFor] = useState(null)
   const [discountFor, setDiscountFor] = useState(null)
 
-  const loadGroup = () => {
+  const loadGroup = useCallback(() => {
     getGroups().then(r => setGroup(r.data.find(g => String(g.id) === groupId) || null)).catch(() => {})
     getTuitionTemplates().then(r => setTemplates(r.data)).catch(() => {})
-  }
+  }, [groupId])
 
-  const loadBalance = () => {
+  const loadBalance = useCallback(() => {
     setLoading(true)
     getBalances({ group: groupId })
       .then(r => setBalance(r.data.groups[0] || { group_id: Number(groupId), group_name: '', rows: [], debtor_count: 0, total_debt: 0 }))
       .catch(() => show(t('payments.toast_load_fail'), 'error'))
       .finally(() => setLoading(false))
-  }
+  }, [groupId, show, t])
 
-  const loadHistory = () => {
+  const loadHistory = useCallback(() => {
     setHistoryLoading(true)
     getPaymentHistory({ group: groupId, page: historyPage, page_size: 20 })
       .then(r => { setHistory(r.data.results); setHistoryPages(r.data.pages) })
       .catch(() => show(t('payments.toast_load_fail'), 'error'))
       .finally(() => setHistoryLoading(false))
-  }
+  }, [groupId, historyPage, show, t])
 
-  useEffect(loadGroup, [groupId])
-  useEffect(loadBalance, [groupId])
-  useEffect(loadHistory, [groupId, historyPage])
+  useEffect(loadGroup, [loadGroup])
+  useEffect(loadBalance, [loadBalance])
+  useEffect(loadHistory, [loadHistory])
 
   const afterRecorded = () => {
     setRecordFor(null)

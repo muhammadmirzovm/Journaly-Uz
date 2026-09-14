@@ -22,7 +22,7 @@ export default function MyPayments() {
       .then(r => { setBalances(r.data.balances); setPayments(r.data.recent_payments) })
       .catch(() => show(t('payments.toast_load_fail'), 'error'))
       .finally(() => setLoading(false))
-  }, [])
+  }, [show, t])
 
   if (loading) {
     return (

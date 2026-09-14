@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
 import { Coins, Wallet, TrendingUp, TrendingDown, Receipt, ChevronLeft, ChevronRight, Loader2, PlusCircle, Search, Users, SlidersHorizontal, Save } from 'lucide-react'
@@ -34,11 +34,11 @@ export default function CoinReport() {
   const [page, setPage]   = useState(1)
   const [pages, setPages] = useState(1)
 
-  const load = () => {
+  const load = useCallback(() => {
     setLoading(true)
     getCoinReport().then(r => setReport(r.data)).catch(() => show(t('coin_report.toast_load_fail'), 'error')).finally(() => setLoading(false))
-  }
-  useEffect(load, [])
+  }, [show, t])
+  useEffect(load, [load])
 
   useEffect(() => {
     setPurchasesLoading(true)
@@ -46,7 +46,7 @@ export default function CoinReport() {
       setPurchases(r.data.results)
       setPages(r.data.pages)
     }).catch(() => show(t('coin_report.toast_purchases_fail'), 'error')).finally(() => setPurchasesLoading(false))
-  }, [page])
+  }, [page, show, t])
 
   const som = n => new Intl.NumberFormat('uz-UZ').format(n)
 
