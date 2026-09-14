@@ -1,0 +1,10 @@
+{
+  "cleanUrls": false,
+  "redirects": [
+    {
+      "source": "/guide",
+      "destination": "/guide.html",
+      "type": 301
+    }
+  ]
+}
