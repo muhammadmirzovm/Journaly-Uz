@@ -1,5 +1,6 @@
 User-agent: *
 Allow: /
+Allow: /guide.html
 
 # Private, login-only areas — no value for search engines
 Disallow: /login

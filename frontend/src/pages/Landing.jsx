@@ -695,6 +695,7 @@ export default function Landing() {
             <p style={footColTitle}>{t('footer.pages')}</p>
             <a href="#features" className="foot-link" style={footLinkStyle}>{t('footer.features')}</a>
             <a href="#faq" className="foot-link" style={footLinkStyle}>{t('footer.faq')}</a>
+            <a href="/guide.html" className="foot-link" style={footLinkStyle}>{t('footer.guide')}</a>
             <Link to="/login" className="foot-link" style={footLinkStyle}>{t('footer.login')}</Link>
             <Link to="/register" className="foot-link" style={footLinkStyle}>{t('footer.register')}</Link>
           </div>
