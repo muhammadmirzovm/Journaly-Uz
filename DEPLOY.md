@@ -105,8 +105,8 @@ On every push to `main`: run tests, then SSH into the server and run
 
 Set `TELEGRAM_BOT_TOKEN` (+ a `TELEGRAM_WEBHOOK_SECRET`) and generate VAPID
 keys in `.env`, `docker compose up -d`, then
-`docker compose exec backend python manage.py set_telegram_webhook`
-(webhook host = `https://<API_DOMAIN>`).
+`docker compose exec backend python manage.py set_telegram_webhook https://<API_DOMAIN>/api/auth/telegram/webhook/`
+(for production, `<API_DOMAIN>` is `api.journaly.uz`).
 
 ## Railway (managed alternative — no server to maintain)
 

@@ -7,7 +7,7 @@ class TelegramWebhookCsrfExemptMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
-        if request.path_info == '/auth/telegram/webhook/':
+        if request.path_info == '/api/auth/telegram/webhook/':
             request.csrf_processing_done = True
         return self.get_response(request)
 

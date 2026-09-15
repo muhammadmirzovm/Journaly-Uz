@@ -9,7 +9,7 @@ class Command(BaseCommand):
     help = 'Register the Telegram webhook URL with Telegram servers'
 
     def add_arguments(self, parser):
-        parser.add_argument('url', help='Full webhook URL, e.g. https://your-app.fly.dev/auth/telegram/webhook/')
+        parser.add_argument('url', help='Full webhook URL, e.g. https://<your-app>/api/auth/telegram/webhook/')
         parser.add_argument('--delete', action='store_true', help='Delete the webhook instead of setting it')
 
     def handle(self, *args, **options):
