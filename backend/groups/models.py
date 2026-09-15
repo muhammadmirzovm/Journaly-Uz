@@ -29,6 +29,10 @@ class Group(models.Model):
     class Meta:
         # Active groups first, graduated ones last, alphabetical within each.
         ordering = ['is_graduated', 'name']
+        indexes = [
+            models.Index(fields=['teacher', 'is_graduated']),
+            models.Index(fields=['teacher', 'is_individual', 'is_graduated']),
+        ]
 
     def __str__(self):
         return self.name
@@ -41,6 +45,10 @@ class GroupMembership(models.Model):
 
     class Meta:
         unique_together = ('group', 'student')
+        indexes = [
+            models.Index(fields=['group', 'joined_at']),
+            models.Index(fields=['student', 'joined_at']),
+        ]
 
     def __str__(self):
         return f'{self.student.username} in {self.group.name}'
@@ -56,6 +64,10 @@ class Lesson(models.Model):
 
     class Meta:
         ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['group', 'date']),
+            models.Index(fields=['group', '-created_at']),
+        ]
 
     def __str__(self):
         return f'{self.group.name} — {self.title}'
@@ -89,6 +101,10 @@ class Attendance(models.Model):
 
     class Meta:
         unique_together = ('lesson', 'student')
+        indexes = [
+            models.Index(fields=['student', 'present']),
+            models.Index(fields=['lesson', 'present']),
+        ]
 
     def __str__(self):
         status = 'present' if self.present else 'absent'
@@ -102,6 +118,10 @@ class Score(models.Model):
 
     class Meta:
         unique_together = ('lesson', 'student')
+        indexes = [
+            models.Index(fields=['student']),
+            models.Index(fields=['lesson']),
+        ]
 
     def __str__(self):
         return f'{self.student.username} — {self.lesson.title}: {self.value}/5'
@@ -115,6 +135,9 @@ class Journal(models.Model):
 
     class Meta:
         unique_together = ('lesson', 'student')
+        indexes = [
+            models.Index(fields=['student', 'updated_at']),
+        ]
 
     def __str__(self):
         return f'{self.student.username} journal — {self.lesson.title}'
@@ -128,6 +151,9 @@ class HomeworkSubmission(models.Model):
 
     class Meta:
         unique_together = ('lesson', 'student')
+        indexes = [
+            models.Index(fields=['student', 'submitted_at']),
+        ]
 
     def __str__(self):
         return f'{self.student.username} homework — {self.lesson.title}'

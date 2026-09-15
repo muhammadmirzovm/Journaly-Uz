@@ -16,6 +16,7 @@ class TuitionCategory(models.Model):
         verbose_name_plural = 'tuition categories'
         unique_together = ('academy', 'name')
         ordering = ['name']
+        indexes = [models.Index(fields=['academy', 'name'])]
 
     def __str__(self):
         return f'{self.name} ({self.academy.name})'
@@ -34,6 +35,7 @@ class TuitionTemplate(models.Model):
     class Meta:
         ordering = ['name']
         unique_together = ('academy', 'category', 'name')
+        indexes = [models.Index(fields=['academy', 'category', 'name'])]
 
     def __str__(self):
         return f'{self.name} — {self.default_price} ({self.academy.name})'
@@ -63,6 +65,9 @@ class StudentTuition(models.Model):
 
     class Meta:
         unique_together = ('student', 'group')
+        indexes = [
+            models.Index(fields=['group', 'student']),
+        ]
 
     def __str__(self):
         return f'{self.student.username} @ {self.group.name} — {self.custom_price}'
@@ -83,7 +88,10 @@ class Enrollment(models.Model):
     ended_at   = models.DateTimeField(null=True, blank=True)
 
     class Meta:
-        indexes = [models.Index(fields=['student', 'group'])]
+        indexes = [
+            models.Index(fields=['student', 'group']),
+            models.Index(fields=['group', 'started_at', 'ended_at']),
+        ]
         ordering = ['-started_at']
 
     def __str__(self):
@@ -110,7 +118,11 @@ class Payment(models.Model):
 
     class Meta:
         ordering = ['-paid_at']
-        indexes = [models.Index(fields=['student', 'group'])]
+        indexes = [
+            models.Index(fields=['student', 'group']),
+            models.Index(fields=['student', 'group', 'paid_at']),
+            models.Index(fields=['group', 'paid_at']),
+        ]
 
     def __str__(self):
         return f'{self.student.username} — {self.amount} ({self.group.name})'

@@ -7,6 +7,7 @@ from django.db.models import Sum, Count
 from django.http import HttpResponse
 from django.utils import timezone
 from asgiref.sync import async_to_sync
+from collections import defaultdict
 import io
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment
@@ -136,8 +137,13 @@ class JoinGroupView(APIView):
         GroupMembership.objects.create(group=group, student=request.user)
 
         today = timezone.localdate()
-        for lesson in group.lessons.filter(date__gte=today):
-            Attendance.objects.get_or_create(lesson=lesson, student=request.user, defaults={'present': False})
+        Attendance.objects.bulk_create(
+            [
+                Attendance(lesson_id=lesson_id, student=request.user, present=False)
+                for lesson_id in group.lessons.filter(date__gte=today).values_list('id', flat=True)
+            ],
+            ignore_conflicts=True,
+        )
 
         return Response(GroupSerializer(group, context={'request': request}).data, status=201)
 
@@ -157,30 +163,45 @@ class GroupMembersView(generics.ListAPIView):
         memberships  = list(group.memberships.select_related('student').filter(student__is_active=True))
         student_ids  = [m.student.id for m in memberships]
 
-        # ── Comprehension (per-student join-date scoped) ──────────────────────
-        comprehension_map = {}
-        for membership in memberships:
-            join_date     = membership.joined_at.date()
-            lessons_since = group.lessons.filter(date__gte=join_date)
-            lesson_count  = lessons_since.count()
-            if lesson_count == 0:
-                comprehension_map[membership.student.id] = None
-            else:
-                score_sum = (
-                    Score.objects
-                    .filter(lesson__in=lessons_since, student=membership.student)
-                    .aggregate(total=Sum('value'))['total'] or 0
-                )
-                comprehension_map[membership.student.id] = round(score_sum / (lesson_count * 5) * 100)
+        joined_by_student = {m.student_id: m.joined_at.date() for m in memberships}
+        lessons = list(group.lessons.values('id', 'date'))
+        lesson_dates = {lesson['id']: lesson['date'] for lesson in lessons}
+        eligible_counts = {
+            sid: sum(1 for lesson in lessons if lesson['date'] >= joined_at)
+            for sid, joined_at in joined_by_student.items()
+        }
 
-        # ── Attendance rate (per-student join-date scoped) ────────────────────
+        score_totals = defaultdict(int)
+        for row in (
+            Score.objects
+            .filter(lesson__group=group, student_id__in=student_ids)
+            .values('student_id', 'lesson_id', 'value')
+        ):
+            if lesson_dates.get(row['lesson_id']) >= joined_by_student[row['student_id']]:
+                score_totals[row['student_id']] += row['value']
+
+        attendance_totals = defaultdict(int)
+        attendance_present = defaultdict(int)
+        for row in (
+            Attendance.objects
+            .filter(lesson__group=group, student_id__in=student_ids)
+            .values('student_id', 'lesson_id', 'present')
+        ):
+            if lesson_dates.get(row['lesson_id']) >= joined_by_student[row['student_id']]:
+                attendance_totals[row['student_id']] += 1
+                if row['present']:
+                    attendance_present[row['student_id']] += 1
+
+        comprehension_map = {}
         attendance_map = {}
-        for membership in memberships:
-            join_date  = membership.joined_at.date()
-            lesson_ids = list(group.lessons.filter(date__gte=join_date).values_list('id', flat=True))
-            total   = Attendance.objects.filter(lesson_id__in=lesson_ids, student=membership.student).count()
-            present = Attendance.objects.filter(lesson_id__in=lesson_ids, student=membership.student, present=True).count()
-            attendance_map[membership.student.id] = round(present / total * 100) if total > 0 else None
+        for sid in student_ids:
+            lesson_count = eligible_counts.get(sid, 0)
+            comprehension_map[sid] = (
+                round(score_totals[sid] / (lesson_count * 5) * 100)
+                if lesson_count else None
+            )
+            total = attendance_totals[sid]
+            attendance_map[sid] = round(attendance_present[sid] / total * 100) if total else None
 
         from users.models import ParentStudent
         from django.contrib.auth import get_user_model
@@ -226,9 +247,11 @@ class LessonListCreateView(generics.ListCreateAPIView):
         lesson = serializer.save(group=group)
         # Skip students who joined after this lesson's date, so a back-dated
         # lesson does not create attendance for members who were not yet in.
-        for membership in group.memberships.filter(student__is_active=True):
-            if membership.joined_at.date() <= lesson.date:
-                Attendance.objects.get_or_create(lesson=lesson, student=membership.student, defaults={'present': False})
+        memberships = group.memberships.filter(student__is_active=True, joined_at__date__lte=lesson.date)
+        Attendance.objects.bulk_create(
+            [Attendance(lesson=lesson, student_id=m.student_id, present=False) for m in memberships],
+            ignore_conflicts=True,
+        )
 
 
 class LessonDetailView(generics.RetrieveUpdateDestroyAPIView):
@@ -271,11 +294,27 @@ class AttendanceView(APIView):
         serializer = BulkAttendanceSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        for record in serializer.validated_data['records']:
-            Attendance.objects.update_or_create(
-                lesson=lesson, student_id=record['student'],
-                defaults={'present': record['present']}
-            )
+        records_by_student = {
+            int(record['student']): bool(record['present'])
+            for record in serializer.validated_data['records']
+        }
+        existing = {
+            attendance.student_id: attendance
+            for attendance in Attendance.objects.filter(lesson=lesson, student_id__in=records_by_student)
+        }
+        to_update = []
+        to_create = []
+        for student_id, present in records_by_student.items():
+            attendance = existing.get(student_id)
+            if attendance:
+                attendance.present = present
+                to_update.append(attendance)
+            else:
+                to_create.append(Attendance(lesson=lesson, student_id=student_id, present=present))
+        if to_update:
+            Attendance.objects.bulk_update(to_update, ['present'])
+        if to_create:
+            Attendance.objects.bulk_create(to_create, ignore_conflicts=True)
 
         records = Attendance.objects.filter(lesson=lesson).select_related('student')
         return Response(AttendanceSerializer(records, many=True).data)
@@ -297,11 +336,27 @@ class ScoreView(APIView):
         serializer = BulkScoreSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        for record in serializer.validated_data['records']:
-            Score.objects.update_or_create(
-                lesson=lesson, student_id=record['student'],
-                defaults={'value': int(record['value'])}
-            )
+        records_by_student = {
+            int(record['student']): int(record['value'])
+            for record in serializer.validated_data['records']
+        }
+        existing = {
+            score.student_id: score
+            for score in Score.objects.filter(lesson=lesson, student_id__in=records_by_student)
+        }
+        to_update = []
+        to_create = []
+        for student_id, value in records_by_student.items():
+            score = existing.get(student_id)
+            if score:
+                score.value = value
+                to_update.append(score)
+            else:
+                to_create.append(Score(lesson=lesson, student_id=student_id, value=value))
+        if to_update:
+            Score.objects.bulk_update(to_update, ['value'])
+        if to_create:
+            Score.objects.bulk_create(to_create, ignore_conflicts=True)
 
         records = Score.objects.filter(lesson=lesson).select_related('student')
         return Response(ScoreSerializer(records, many=True).data)
@@ -399,6 +454,14 @@ class AddMemberDirectView(APIView):
             return Response({'detail': 'Individual group already has a student.'}, status=400)
 
         GroupMembership.objects.create(group=group, student=student)
+        today = timezone.localdate()
+        Attendance.objects.bulk_create(
+            [
+                Attendance(lesson_id=lesson_id, student=student, present=False)
+                for lesson_id in group.lessons.filter(date__gte=today).values_list('id', flat=True)
+            ],
+            ignore_conflicts=True,
+        )
         return Response({'detail': 'Added.'}, status=201)
 
 

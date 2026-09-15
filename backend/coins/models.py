@@ -68,7 +68,10 @@ class CoinTransaction(models.Model):
 
     class Meta:
         ordering = ['-created_at']
-        indexes = [models.Index(fields=['student', '-created_at'])]
+        indexes = [
+            models.Index(fields=['student', '-created_at']),
+            models.Index(fields=['student', 'type', '-created_at']),
+        ]
 
     def __str__(self):
         return f'{self.student} {self.amount:+d} ({self.type})'
