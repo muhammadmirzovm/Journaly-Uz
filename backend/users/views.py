@@ -865,18 +865,17 @@ class PasswordResetRequestView(APIView):
 
         username = request.data.get('username', '').strip()
         if not username:
-            return Response({'detail': 'Username is required.'}, status=400)
+            return Response({'detail': 'username_required'}, status=400)
 
         try:
             user = User.objects.get(username=username)
         except User.DoesNotExist:
             # Avoid username enumeration — return same response
-            return Response({'detail': 'If this account exists and has Telegram connected, an OTP has been sent.'})
+            return Response({'detail': 'reset_if_available'})
 
         if not user.telegram_id:
             return Response(
-                {'detail': 'no_telegram',
-                 'message': 'This account has no Telegram connected. Contact your admin to reset your password.'},
+                {'detail': 'no_telegram'},
                 status=400,
             )
 
@@ -895,9 +894,9 @@ class PasswordResetRequestView(APIView):
         except Exception as e:
             import logging
             logging.getLogger(__name__).error(f'OTP send failed: {e}')
-            return Response({'detail': 'Failed to send OTP. Please try again later.'}, status=500)
+            return Response({'detail': 'reset_delivery_failed'}, status=500)
 
-        return Response({'detail': 'If this account exists and has Telegram connected, an OTP has been sent.'})
+        return Response({'detail': 'reset_if_available'})
 
 
 class PasswordResetConfirmView(APIView):
@@ -912,20 +911,20 @@ class PasswordResetConfirmView(APIView):
         new_password = request.data.get('new_password', '').strip()
 
         if not username or not code or not new_password:
-            return Response({'detail': 'username, code, and new_password are required.'}, status=400)
+            return Response({'detail': 'reset_fields_required'}, status=400)
 
         if len(new_password) < 6:
-            return Response({'detail': 'Password must be at least 6 characters.'}, status=400)
+            return Response({'detail': 'password_too_short'}, status=400)
 
         try:
             user = User.objects.get(username=username)
         except User.DoesNotExist:
-            return Response({'detail': 'Invalid code or username.'}, status=400)
+            return Response({'detail': 'invalid_reset_code'}, status=400)
 
         otp = TelegramOTP.objects.filter(user=user, code=code, used=False).order_by('-expires_at').first()
 
         if not otp or not otp.is_valid():
-            return Response({'detail': 'Invalid or expired code.'}, status=400)
+            return Response({'detail': 'invalid_reset_code'}, status=400)
 
         otp.used = True
         otp.save(update_fields=['used'])
@@ -933,7 +932,7 @@ class PasswordResetConfirmView(APIView):
         user.set_password(new_password)
         user.save()
 
-        return Response({'detail': 'Password reset successfully. You can now log in.'})
+        return Response({'detail': 'password_reset_success'})
 
 
 class NotificationListView(APIView):

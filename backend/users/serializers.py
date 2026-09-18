@@ -10,7 +10,7 @@ class RegisterSerializer(serializers.ModelSerializer):
 
     class Meta:
         model  = User
-        fields = ('id', 'username', 'email', 'first_name', 'last_name', 'password')
+        fields = ('id', 'username', 'email', 'first_name', 'last_name', 'password', 'ui_language')
 
     def create(self, validated_data):
         user = User.objects.create_user(**validated_data)
@@ -29,7 +29,7 @@ class UserSerializer(serializers.ModelSerializer):
         fields = (
             'id', 'username', 'email', 'first_name', 'last_name',
             'role', 'bio', 'academy', 'academy_name', 'academy_color',
-            'has_password', 'telegram_id', 'last_seen', 'date_joined',
+            'has_password', 'telegram_id', 'ui_language', 'last_seen', 'date_joined',
         )
         read_only_fields = (
             'id', 'role', 'academy', 'academy_name', 'academy_color',

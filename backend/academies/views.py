@@ -4,6 +4,7 @@ from rest_framework.views import APIView
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.utils.text import slugify
+from django.db import transaction
 from django.db.models import Q
 from datetime import timedelta
 from .models import Academy, InviteToken, AcademyTelegramGroup
@@ -283,6 +284,7 @@ class InviteAcceptView(APIView):
     """Called after a user registers/logs in via an invite link."""
     permission_classes = (permissions.IsAuthenticated,)
 
+    @transaction.atomic
     def post(self, request, token):
         invite = get_object_or_404(InviteToken, token=token)
         if not invite.is_valid:

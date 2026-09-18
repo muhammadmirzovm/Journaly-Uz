@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next'
 import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
 import NotificationBell from './NotificationBell'
+import api from '../api/axios'
 
 const LANGS = [
   { code: 'en', label: 'EN', full: 'English' },
@@ -41,7 +42,10 @@ export default function Navbar() {
   useEffect(() => { setDrawerOpen(false); setMenuOpen(false) }, [location.pathname])
 
   const handleLogout = () => { logout(); navigate('/login') }
-  const setLang = (code) => { i18n.changeLanguage(code) }
+  const setLang = async (code) => {
+    i18n.changeLanguage(code)
+    try { await api.patch('/auth/me/', { ui_language: code }) } catch (_) { /* local language still works */ }
+  }
 
   const isActive = (path) =>
     path === '/' ? location.pathname === '/' : location.pathname.startsWith(path)

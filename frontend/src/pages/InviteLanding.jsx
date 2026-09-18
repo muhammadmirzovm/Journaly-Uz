@@ -1,13 +1,18 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
-import { GraduationCap, BookOpen, Users, Sparkles, Eye, EyeOff, ArrowRight, Loader2, CheckCircle2, AlertCircle } from 'lucide-react'
+import { GraduationCap, BookOpen, Users, Sparkles, Eye, EyeOff, ArrowRight, Loader2, CheckCircle2, AlertCircle, Globe } from 'lucide-react'
 import api from '../api/axios'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 
 const ROLE_ICONS = { teacher: GraduationCap, student: BookOpen, admin: Users, parent: Users }
+const LANGS = [
+  { code: 'uz', label: "O'zbek", short: 'UZ' },
+  { code: 'ru', label: 'Русский', short: 'RU' },
+  { code: 'en', label: 'English', short: 'EN' },
+]
 
 function hexToRgb(hex) {
   const r = parseInt(hex.slice(1, 3), 16)
@@ -21,11 +26,12 @@ export default function InviteLanding() {
   const navigate       = useNavigate()
   const { login, user } = useAuth()
   const { show }       = useToast()
-  const { t }          = useTranslation()
+  const { t, i18n }   = useTranslation()
 
   const [invite,  setInvite]  = useState(null)
-  const [status,  setStatus]  = useState('loading') // loading | valid | invalid
+  const [status,  setStatus]  = useState('loading') // loading | valid | invalid | error
   const [mode,    setMode]    = useState('choose')   // choose | register | login
+  const [languageSelected, setLanguageSelected] = useState(Boolean(user))
   const [loading, setLoading] = useState(false)
 
   const [form, setForm] = useState({ first_name: '', last_name: '', username: '', email: '', password: '', confirm: '' })
@@ -34,11 +40,18 @@ export default function InviteLanding() {
   const [showConfirm, setShowConfirm] = useState(false)
   const [errors, setErrors] = useState({})
 
-  useEffect(() => {
+  const verifyInvite = useCallback(() => {
+    setStatus('loading')
     api.get(`/invites/${token}/verify/`)
       .then(r => { setInvite(r.data); setStatus('valid') })
-      .catch(() => setStatus('invalid'))
+      .catch(err => setStatus(err.response?.status === 400 ? 'invalid' : 'error'))
   }, [token])
+
+  useEffect(() => { verifyInvite() }, [verifyInvite])
+
+  useEffect(() => {
+    if (user) setLanguageSelected(true)
+  }, [user])
 
   const color     = invite?.academy?.primary_color || '#0D9488'
   const colorRgb  = invite ? hexToRgb(color) : '13, 148, 136'
@@ -46,6 +59,15 @@ export default function InviteLanding() {
 
   const set = (k, v) => { setForm(f => ({ ...f, [k]: v })); setErrors(e => ({ ...e, [k]: '' })) }
   const setL = (k, v) => { setLoginForm(f => ({ ...f, [k]: v })); setErrors(e => ({ ...e, [k]: '' })) }
+
+  const chooseLanguage = code => {
+    i18n.changeLanguage(code)
+    setLanguageSelected(true)
+    setMode('choose')
+    setErrors({})
+    setForm({ first_name: '', last_name: '', username: '', email: '', password: '', confirm: '' })
+    setLoginForm({ username: '', password: '' })
+  }
 
   const acceptInvite = async () => {
     await api.post(`/invites/${token}/accept/`)
@@ -68,6 +90,7 @@ export default function InviteLanding() {
       const { confirm: _, ...payload } = form
       const { data } = await api.post('/auth/register/', {
         ...payload,
+        ui_language: i18n.language,
         role: invite.role,
       })
       login(data.tokens, data.user)
@@ -159,6 +182,23 @@ export default function InviteLanding() {
     )
   }
 
+  if (status === 'error') {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)', padding: 24 }}>
+        <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} style={{ textAlign: 'center', maxWidth: 400 }}>
+          <div style={{ width: 80, height: 80, borderRadius: '50%', background: 'rgba(245,158,11,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px' }}>
+            <AlertCircle size={40} color="#f59e0b" />
+          </div>
+          <h1 style={{ fontSize: 24, fontWeight: 800, color: 'var(--text)', marginBottom: 8 }}>{t('invite.error_title')}</h1>
+          <p style={{ color: 'var(--text-muted)', marginBottom: 24, lineHeight: 1.6 }}>{t('invite.error_sub')}</p>
+          <button type="button" onClick={verifyInvite} style={{ padding: '12px 28px', borderRadius: 12, border: 'none', background: '#0D9488', color: '#fff', fontWeight: 700, cursor: 'pointer' }}>
+            {t('invite.retry')}
+          </button>
+        </motion.div>
+      </div>
+    )
+  }
+
   return (
     <div style={{
       minHeight: '100vh', position: 'relative', overflow: 'hidden',
@@ -190,7 +230,7 @@ export default function InviteLanding() {
           <h1 style={{ fontSize: 26, fontWeight: 800, color: 'var(--text)', marginBottom: 4 }}>
             {invite.academy.name}
           </h1>
-          <div style={{
+          {!(!user && !languageSelected) && <div style={{
             display: 'inline-flex', alignItems: 'center', gap: 6,
             padding: '6px 14px', borderRadius: 20,
             background: `rgba(${colorRgb},0.12)`, color: color,
@@ -200,8 +240,8 @@ export default function InviteLanding() {
             {t('invite.invited_as', { role: t(`settings.role_${invite.role}`, { defaultValue: invite.role }) })}
             {invite.student_name && ` · ${t('invite.for_student', { name: invite.student_name })}`}
             {invite.group_name && ` · ${invite.group_name}`}
-          </div>
-          {invite.note && (
+          </div>}
+          {!(!user && !languageSelected) && invite.note && (
             <p style={{ marginTop: 12, fontSize: 14, color: 'var(--text-muted)', fontStyle: 'italic' }}>
               "{invite.note}"
             </p>
@@ -216,8 +256,31 @@ export default function InviteLanding() {
         }}>
           <AnimatePresence mode="wait">
 
+            {/* Step: choose language before showing onboarding */}
+            {!user && !languageSelected && (
+              <motion.div key="language" initial={{ opacity: 0, x: -16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 16 }}>
+                <div style={{ textAlign: 'center', marginBottom: 22 }}>
+                  <div style={{ width: 44, height: 44, borderRadius: 14, background: `rgba(${colorRgb},0.12)`, color, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px' }}>
+                    <Globe size={22} />
+                  </div>
+                  <h2 style={{ fontSize: 20, fontWeight: 800, color: 'var(--text)', marginBottom: 8 }}>{t('invite.select_language')}</h2>
+                  <p style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.5 }}>{t('invite.select_language_sub')}</p>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {LANGS.map(lang => (
+                    <button key={lang.code} type="button" onClick={() => chooseLanguage(lang.code)}
+                      style={{ width: '100%', minHeight: 52, padding: '12px 16px', borderRadius: 14, border: '1.5px solid var(--border)', background: 'var(--bg)', color: 'var(--text)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, fontSize: 15, fontWeight: 700, textAlign: 'left' }}>
+                      <span style={{ width: 32, height: 32, borderRadius: 9, background: `rgba(${colorRgb},0.12)`, color, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800 }}>{lang.short}</span>
+                      {lang.label}
+                      <ArrowRight size={17} style={{ marginLeft: 'auto', color: 'var(--text-muted)' }} />
+                    </button>
+                  ))}
+                </div>
+              </motion.div>
+            )}
+
             {/* Step: choose register or login */}
-            {mode === 'choose' && (
+            {languageSelected && mode === 'choose' && (
               <motion.div key="choose" initial={{ opacity: 0, x: -16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 16 }}>
                 {user ? (
                   <div style={{ textAlign: 'center' }}>
@@ -289,7 +352,7 @@ export default function InviteLanding() {
             )}
 
             {/* Step: register */}
-            {mode === 'register' && (
+            {languageSelected && mode === 'register' && (
               <motion.div key="register" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
                 <button onClick={() => setMode('choose')}
                   style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 13, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -300,21 +363,21 @@ export default function InviteLanding() {
                   <div className="form-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                     <div>
                       <label style={labelStyle}>{t('auth.first_name')}</label>
-                      <input style={inputStyle(!!errors.first_name)} placeholder="John"
+                      <input style={inputStyle(!!errors.first_name)} placeholder={t('auth.first_name_placeholder')}
                         value={form.first_name} onChange={e => set('first_name', e.target.value)}
                         onFocus={ev => { ev.target.style.borderColor = color }} onBlur={ev => { ev.target.style.borderColor = 'var(--border)' }} />
                       {errors.first_name && <p style={{ fontSize: 11, color: '#f87171', marginTop: 3 }}>{errors.first_name}</p>}
                     </div>
                     <div>
                       <label style={labelStyle}>{t('auth.last_name')}</label>
-                      <input style={inputStyle(false)} placeholder="Doe"
+                      <input style={inputStyle(false)} placeholder={t('auth.last_name_placeholder')}
                         value={form.last_name} onChange={e => set('last_name', e.target.value)}
                         onFocus={ev => { ev.target.style.borderColor = color }} onBlur={ev => { ev.target.style.borderColor = 'var(--border)' }} />
                     </div>
                   </div>
                   <div>
                     <label style={labelStyle}>{t('auth.username')}</label>
-                    <input style={inputStyle(!!errors.username)} placeholder="johndoe"
+                      <input style={inputStyle(!!errors.username)} placeholder={t('auth.username_placeholder')}
                       value={form.username} onChange={e => set('username', e.target.value)} autoComplete="username"
                       onFocus={ev => { ev.target.style.borderColor = color }} onBlur={ev => { ev.target.style.borderColor = 'var(--border)' }} />
                     {errors.username && <p style={{ fontSize: 11, color: '#f87171', marginTop: 3 }}>{errors.username}</p>}
@@ -374,7 +437,7 @@ export default function InviteLanding() {
             )}
 
             {/* Step: login */}
-            {mode === 'login' && (
+            {languageSelected && mode === 'login' && (
               <motion.div key="login" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
                 <button onClick={() => setMode('choose')}
                   style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 13, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -384,7 +447,7 @@ export default function InviteLanding() {
                 <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                   <div>
                     <label style={labelStyle}>{t('auth.username')}</label>
-                    <input style={inputStyle(!!errors.username)} placeholder="johndoe"
+                    <input style={inputStyle(!!errors.username)} placeholder={t('auth.username_placeholder')}
                       value={loginForm.username} onChange={e => setL('username', e.target.value)} autoComplete="username"
                       onFocus={ev => { ev.target.style.borderColor = color }} onBlur={ev => { ev.target.style.borderColor = 'var(--border)' }} />
                     {errors.username && <p style={{ fontSize: 11, color: '#f87171', marginTop: 3 }}>{errors.username}</p>}

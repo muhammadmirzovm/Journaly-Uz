@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next'
 import { Send, KeyRound, CheckCircle2, Loader2, ArrowLeft, Eye, EyeOff } from 'lucide-react'
 import { passwordResetRequest, passwordResetConfirm } from '../api/users'
 import { useDocumentMeta } from '../hooks/useDocumentMeta'
+import LanguagePicker from '../components/LanguagePicker'
 
 const inputStyle = (hasErr) => ({
   width: '100%', padding: '13px 16px', borderRadius: 12, boxSizing: 'border-box',
@@ -56,17 +57,16 @@ export default function ForgotPassword() {
       setStep(2)
     } catch (err) {
       const detail = err.response?.data?.detail
-      if (detail === 'no_telegram') {
-        setError(err.response.data.message)
-      } else {
-        setError(detail || t('common.fail_load'))
-      }
+      if (detail === 'no_telegram') setError(t('auth.reset_no_telegram'))
+      else if (detail === 'username_required') setError(t('auth.err_username_required'))
+      else if (detail === 'reset_if_available') setError(t('auth.reset_if_available'))
+      else setError(t('common.fail_load'))
     } finally { setLoading(false) }
   }
 
   const handleConfirm = async e => {
     e.preventDefault()
-    if (!code.trim())           { setError(t('auth.otp_code') + ' required'); return }
+    if (!code.trim())           { setError(t('auth.otp_required')); return }
     if (!newPassword)           { setError(t('auth.err_password_required')); return }
     if (newPassword.length < 6) { setError(t('auth.err_password_len')); return }
     if (newPassword !== confirmPw) { setError(t('auth.err_confirm_match')); return }
@@ -76,7 +76,13 @@ export default function ForgotPassword() {
       await passwordResetConfirm({ username, code: code.trim(), new_password: newPassword })
       setStep(3)
     } catch (err) {
-      setError(err.response?.data?.detail || t('auth.err_invalid'))
+      const detail = err.response?.data?.detail
+      const messages = {
+        reset_fields_required: t('auth.reset_fields_required'),
+        password_too_short: t('auth.err_password_len'),
+        invalid_reset_code: t('auth.invalid_reset_code'),
+      }
+      setError(messages[detail] || t('auth.err_invalid'))
     } finally { setLoading(false) }
   }
 
@@ -98,6 +104,7 @@ export default function ForgotPassword() {
         transition={{ type: 'spring', stiffness: 180, damping: 22 }}
         style={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: 400 }}
       >
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 18 }}><LanguagePicker compact /></div>
         {step < 3 && (
           <Link to="/login" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#0D9488', fontWeight: 600, textDecoration: 'none', marginBottom: 20 }}>
             <ArrowLeft size={14} /> {t('auth.back_to_login')}
@@ -141,7 +148,7 @@ export default function ForgotPassword() {
                 <div>
                   <label style={labelStyle}>{t('auth.username')}</label>
                   <input value={username} onChange={e => { setUsername(e.target.value); setError('') }}
-                    placeholder="johndoe" autoFocus autoComplete="username"
+                    placeholder={t('auth.username_placeholder')} autoFocus autoComplete="username"
                     style={inputStyle(false)}
                     onFocus={e => e.target.style.borderColor = '#14B8A8'}
                     onBlur={e => e.target.style.borderColor = 'var(--border)'} />

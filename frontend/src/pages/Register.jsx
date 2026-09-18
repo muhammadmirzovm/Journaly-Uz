@@ -3,6 +3,7 @@ import { motion } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
 import { GraduationCap, Lock, LogIn } from 'lucide-react'
 import { useDocumentMeta } from '../hooks/useDocumentMeta'
+import LanguagePicker from '../components/LanguagePicker'
 
 export default function Register() {
   const { t } = useTranslation()
@@ -24,6 +25,8 @@ export default function Register() {
       <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }}
         transition={{ type: 'spring', stiffness: 180, damping: 22 }}
         style={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: 420, textAlign: 'center' }}>
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 18 }}><LanguagePicker compact /></div>
 
         <div style={{
           display: 'inline-flex', width: 72, height: 72, borderRadius: 20,

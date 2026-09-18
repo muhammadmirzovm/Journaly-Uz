@@ -20,6 +20,11 @@ class User(AbstractUser):
     last_seen   = models.DateTimeField(null=True, blank=True)
     telegram_id   = models.BigIntegerField(null=True, blank=True, unique=True)
     telegram_lang = models.CharField(max_length=2, null=True, blank=True, default='uz')
+    ui_language = models.CharField(
+        max_length=2,
+        choices=[('uz', 'Uzbek'), ('ru', 'Russian'), ('en', 'English')],
+        default='uz',
+    )
     academy   = models.ForeignKey(
         'academies.Academy',
         on_delete=models.SET_NULL,

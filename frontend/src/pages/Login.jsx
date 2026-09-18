@@ -7,6 +7,7 @@ import api from '../api/axios'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import { useDocumentMeta } from '../hooks/useDocumentMeta'
+import LanguagePicker from '../components/LanguagePicker'
 
 export default function Login() {
   const navigate = useNavigate()
@@ -53,6 +54,7 @@ export default function Login() {
         transition={{ type: 'spring', stiffness: 180, damping: 22 }}
         style={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: 400 }}
       >
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 18 }}><LanguagePicker compact /></div>
         {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: 32 }}>
           <motion.div
@@ -96,7 +98,7 @@ export default function Login() {
               </label>
               <input
                 value={form.username} onChange={e => set('username', e.target.value)}
-                placeholder="johndoe" autoComplete="username" autoFocus
+                placeholder={t('auth.username_placeholder')} autoComplete="username" autoFocus
                 style={{
                   width: '100%', padding: '13px 16px', borderRadius: 12, boxSizing: 'border-box',
                   background: 'var(--bg)',
