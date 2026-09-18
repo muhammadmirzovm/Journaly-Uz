@@ -77,6 +77,13 @@ class GroupListCreateView(generics.ListCreateAPIView):
         return qs.filter(memberships__student=user)
 
     def perform_create(self, serializer):
+        academy = self.request.user.academy
+        if academy and not academy.is_active:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied('This academy is currently inactive.')
+        if academy and Group.objects.filter(teacher__academy=academy).count() >= academy.max_groups:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied('This academy has reached its group limit.')
         serializer.save(teacher=self.request.user)
 
 

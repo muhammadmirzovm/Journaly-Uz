@@ -28,6 +28,7 @@ import PurchaseScanner from './pages/PurchaseScanner'
 import Payments from './pages/Payments'
 import GroupPayments from './pages/GroupPayments'
 import MyPayments from './pages/MyPayments'
+import SuperAdmin from './pages/SuperAdmin'
 
 function AppShell() {
   const { loading } = useAuth()
@@ -66,6 +67,7 @@ function AppShell() {
             <Route path="/payments"          element={<ProtectedRoute roles={['admin']}><Payments /></ProtectedRoute>} />
             <Route path="/payments/groups/:groupId" element={<ProtectedRoute roles={['admin']}><GroupPayments /></ProtectedRoute>} />
             <Route path="/my-payments"       element={<ProtectedRoute roles={['student','parent']}><MyPayments /></ProtectedRoute>} />
+            <Route path="/superadmin" element={<ProtectedRoute superuser><SuperAdmin /></ProtectedRoute>} />
             <Route path="/scanner"           element={<ProtectedRoute roles={['admin']}><PurchaseScanner /></ProtectedRoute>} />
             <Route path="*"                  element={<NotFound />} />
           </Routes>

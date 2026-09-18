@@ -5,10 +5,114 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.utils.text import slugify
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Q, Count
+from django.contrib.auth import get_user_model
 from datetime import timedelta
 from .models import Academy, InviteToken, AcademyTelegramGroup
 from .serializers import AcademySerializer, AcademyBrandSerializer, InviteTokenSerializer, AcademyTelegramGroupSerializer
+
+User = get_user_model()
+
+
+def _platform_admin(request):
+    return bool(request.user and request.user.is_authenticated and request.user.is_superuser)
+
+
+class PlatformOverviewView(APIView):
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def get(self, request):
+        if not _platform_admin(request):
+            return Response({'detail': 'Platform administrator access required.'}, status=403)
+        from groups.models import Group
+        academies = Academy.objects.all()
+        return Response({
+            'academies': academies.count(),
+            'active_academies': academies.filter(is_active=True).count(),
+            'students': User.objects.filter(role='student', academy__isnull=False).count(),
+            'teachers': User.objects.filter(role='teacher', academy__isnull=False).count(),
+            'groups': Group.objects.filter(teacher__academy__isnull=False).count(),
+            'telegram_users': User.objects.filter(telegram_id__isnull=False).count(),
+        })
+
+
+class PlatformAcademyListView(APIView):
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def get(self, request):
+        if not _platform_admin(request):
+            return Response({'detail': 'Platform administrator access required.'}, status=403)
+        query = request.query_params.get('q', '').strip()
+        qs = Academy.objects.select_related('created_by').annotate(
+            student_total=Count('members', filter=Q(members__role='student'), distinct=True),
+            teacher_total=Count('members', filter=Q(members__role='teacher'), distinct=True),
+            group_total=Count('members__taught_groups', distinct=True),
+        )
+        if query:
+            qs = qs.filter(Q(name__icontains=query) | Q(slug__icontains=query))
+        rows = []
+        for academy in qs.order_by('-created_at'):
+            rows.append({
+                'id': academy.id,
+                'name': academy.name,
+                'slug': academy.slug,
+                'is_active': academy.is_active,
+                'created_at': academy.created_at,
+                'owner': academy.created_by.username if academy.created_by else None,
+                'students': academy.student_total,
+                'teachers': academy.teacher_total,
+                'groups': academy.group_total,
+                'limits': {
+                    'students': academy.max_students,
+                    'teachers': academy.max_teachers,
+                    'groups': academy.max_groups,
+                    'invites_per_month': academy.max_invites_per_month,
+                },
+            })
+        return Response(rows)
+
+
+class PlatformAcademyDetailView(APIView):
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def patch(self, request, pk):
+        if not _platform_admin(request):
+            return Response({'detail': 'Platform administrator access required.'}, status=403)
+        academy = get_object_or_404(Academy, pk=pk)
+        allowed = ('is_active', 'max_students', 'max_teachers', 'max_groups', 'max_invites_per_month')
+        updates = {key: request.data[key] for key in allowed if key in request.data}
+        for key, value in updates.items():
+            try:
+                if key != 'is_active' and int(value) < 0:
+                    raise ValueError
+                if key == 'is_active' and not isinstance(value, bool):
+                    raise ValueError
+            except (TypeError, ValueError):
+                return Response({'detail': f'Invalid value for {key}.'}, status=400)
+        for key, value in updates.items():
+            setattr(academy, key, int(value) if key != 'is_active' else value)
+        academy.save(update_fields=list(updates))
+        return Response(AcademySerializer(academy).data)
+
+
+class PlatformInviteCreateView(APIView):
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def post(self, request):
+        if not _platform_admin(request):
+            return Response({'detail': 'Platform administrator access required.'}, status=403)
+        academy = get_object_or_404(Academy, pk=request.data.get('academy'))
+        role = request.data.get('role', 'student')
+        if role not in ('teacher', 'student', 'admin', 'parent'):
+            return Response({'detail': 'Invalid role.'}, status=400)
+        max_uses = max(1, int(request.data.get('max_uses', 1)))
+        days_valid = max(1, int(request.data.get('days_valid', 7)))
+        invite = InviteToken.objects.create(
+            academy=academy, role=role, created_by=request.user,
+            expires_at=timezone.now() + timedelta(days=days_valid),
+            max_uses=max_uses, note=str(request.data.get('note', '')).strip(),
+        )
+        return Response(InviteTokenSerializer(invite).data, status=201)
 
 
 class AcademyCreateView(generics.CreateAPIView):
@@ -289,6 +393,8 @@ class InviteAcceptView(APIView):
         invite = get_object_or_404(InviteToken, token=token)
         if not invite.is_valid:
             return Response({'detail': 'This invite link has expired or reached its use limit.'}, status=400)
+        if not invite.academy.is_active:
+            return Response({'detail': 'This academy is currently inactive.'}, status=403)
 
         user = request.user
         if invite.used_by.filter(pk=user.pk).exists():
@@ -299,6 +405,12 @@ class InviteAcceptView(APIView):
             return Response({'detail': 'This account already belongs to a different academy. Log out and use a different account to accept this invite.'}, status=400)
         if not joining_new_academy and user.role != invite.role:
             return Response({'detail': f'This account is already registered as {user.get_role_display()}. Log out and create a separate account to accept this invite.'}, status=400)
+
+        academy_members = User.objects.filter(academy=invite.academy)
+        if invite.role == 'student' and joining_new_academy and academy_members.filter(role='student').count() >= invite.academy.max_students:
+            return Response({'detail': 'This academy has reached its student limit.'}, status=403)
+        if invite.role == 'teacher' and joining_new_academy and academy_members.filter(role='teacher').count() >= invite.academy.max_teachers:
+            return Response({'detail': 'This academy has reached its teacher limit.'}, status=403)
 
         user.academy = invite.academy
         user.role    = invite.role

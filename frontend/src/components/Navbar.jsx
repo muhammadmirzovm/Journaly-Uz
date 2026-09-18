@@ -1,5 +1,5 @@
 import { Link, useNavigate, useLocation } from 'react-router-dom'
-import { Sun, Moon, Menu, X, GraduationCap, LogOut, User, LayoutDashboard, Users, Globe, BookMarked, Settings, Gift, HelpCircle, Wallet } from 'lucide-react'
+import { Sun, Moon, Menu, X, GraduationCap, LogOut, User, LayoutDashboard, Users, Globe, BookMarked, Settings, Gift, HelpCircle, Wallet, Shield } from 'lucide-react'
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
@@ -102,6 +102,7 @@ export default function Navbar() {
             {navLinks.map(link => (
               <NavLink key={link.to} to={link.to} active={isActive(link.to)} icon={link.icon} label={link.label} />
             ))}
+            {user?.is_superuser && <NavLink to="/superadmin" active={isActive('/superadmin')} icon={<Shield size={15} />} label="Platform" />}
           </div>
 
           {/* Desktop right controls */}

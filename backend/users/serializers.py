@@ -29,11 +29,11 @@ class UserSerializer(serializers.ModelSerializer):
         fields = (
             'id', 'username', 'email', 'first_name', 'last_name',
             'role', 'bio', 'academy', 'academy_name', 'academy_color',
-            'has_password', 'telegram_id', 'ui_language', 'last_seen', 'date_joined',
+            'has_password', 'telegram_id', 'ui_language', 'is_superuser', 'last_seen', 'date_joined',
         )
         read_only_fields = (
             'id', 'role', 'academy', 'academy_name', 'academy_color',
-            'has_password', 'telegram_id', 'last_seen', 'date_joined',
+            'has_password', 'telegram_id', 'is_superuser', 'last_seen', 'date_joined',
         )
 
     def get_has_password(self, obj):

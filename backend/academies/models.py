@@ -18,6 +18,11 @@ class Academy(models.Model):
     weekly_report_time = models.TimeField(null=True, blank=True, help_text='Weekly parent report time in UTC (sent every Sunday)')
     stamp              = models.ImageField(upload_to='academy_stamps/', blank=True, null=True, help_text="To'lov kvitansiyalarida ko'rinadigan muhr/pechat rasmi")
     created_at  = models.DateTimeField(auto_now_add=True)
+    is_active   = models.BooleanField(default=True)
+    max_students = models.PositiveIntegerField(default=100)
+    max_teachers = models.PositiveIntegerField(default=10)
+    max_groups   = models.PositiveIntegerField(default=20)
+    max_invites_per_month = models.PositiveIntegerField(default=500)
 
     class Meta:
         verbose_name_plural = 'academies'
